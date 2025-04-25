@@ -1,0 +1,109 @@
+[build-system]
+# Specifies the build system requirements.
+requires = ["setuptools>=61.0", "wheel", "setuptools-git-versioning>=2.0,<3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# Basic project information and metadata.
+name = "mapext"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Thomas J. Rennie" }]
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "healpy",
+  "astropy",
+  "astropy-healpix",
+  "pyyaml",
+  "reproject"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+
+# Documentation-related dependencies
+docs = [
+  "sphinx",
+  "sphinx_rtd_theme",
+  "ghp-import",
+  "myst-parser",
+]
+
+# Development dependencies for testing and code quality tools
+dev = [
+  "pytest",
+  "black",
+  "ruff"
+]
+
+[project.urls]
+# Links for the project repository and issues tracker.
+Repository = "https://github.com/tjrennie/mapext"
+Issues = "https://github.com/tjrennie/mapext/issues"
+
+[tool.setuptools-git-versioning]
+enabled = true
+
+[tool.ruff]
+# Linter configuration using `ruff`. Lists the rules to be enabled.
+lint.select = [
+    "E",     # pycodestyle (basic style issues)
+    "D",     # pydocstyle (docstring style)
+    "F",     # pyflakes (logical errors)
+    "I",     # isort (import sorting)
+    "UP",    # pyupgrade (suggests Python syntax improvements)
+    "NPY",   # numpy-specific checks
+    "RUF",   # ruff-specific rules
+    "BLE",   # flake8-blind-except (bare except blocks)
+    "C4",    # flake8-comprehensions (suggests simplifying comprehensions)
+    "RET"    # flake8-return (checks for redundant return statements)
+]
+
+# Rules to ignore during linting.
+lint.ignore = [
+    "E501",  # Line too long (handled by `black` instead)
+    "E741",  # Ambiguous variable name (like 'l', 'O', 'I')
+
+    # Docstring style rules (often subjective or redundant in some files)
+    "D105",  # Missing docstring in magic method
+    "D107",  # Missing docstring in __init__
+    "D203",  # One blank line required before class docstring
+    "D213",  # Multi-line docstring summary should start at the second line
+    "D400",  # First line should end with a period
+    "D401",  # First line should be in imperative mood
+    "D402",  # First line should not be the function’s signature
+    "D413",  # Missing blank line after last section in docstring
+    "D416",  # Section name should end with a colon
+
+    # Numpy-specific rule (sometimes skipped for compatibility)
+    "NPY002" # Use np.random.Generator instead of legacy calls
+]
+
+# Directories and files to exclude from linting.
+exclude = [
+    ".git",   # Git directory
+    ".github",# GitHub workflows and config
+    "build",  # Build directories
+    "doc",    # Documentation
+    "test",   # Test directory
+    "*/__init__.py"  # `__init__.py` files used for exposing modules
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Custom linting rules for specific files or directories.
+"__init__.py" = [
+    "F401",  # Ignore unused imports in `__init__.py` (used to expose APIs)
+    "F403"   # Ignore `import *` in `__init__.py` (common for public interfaces)
+]
+
+# Ignore rules in test files (tests are usually more flexible in style).
+"tests/**/*.py" = [
+    "D",     # Skip docstring rules in test files
+    "S101",  # Allow `assert` statements in tests
+    "PLR2004" # Allow magic values in test comparisons (e.g., `assert x == 42`)
+]
