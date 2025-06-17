@@ -179,13 +179,16 @@ This reverts commit <hash>.
 
 #### Type
 
-- **build**: Build system or dependency changes
+- **build**: Build system, configuration, or dependency changes
+- **chore**: Routine tasks or maintenance that do not affect functionality
+- **ci**: Continuous integration setup or changes
 - **docs**: Documentation only
-- **feat**: New features
-- **fix**: Bug fixes
-- **perf**: Performance improvements
-- **refactor**: Code refactoring
-- **style**: Code style changes (formatting, etc.)
+- **feat**: New features or functionality
+- **fix**: Bug fixes and patches
+- **perf**: Performance improvements without behavior changes
+- **refactor**: Code refactoring or restructuring that neither fixes bugs nor adds features
+- **revert**: Reverts a previous commit
+- **style**: Code style changes (formatting, whitespace, etc.)
 - **test**: Adding or updating tests
 
 #### Scope
