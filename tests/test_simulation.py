@@ -1,5 +1,3 @@
-import logging
-
 import numpy as np
 import pytest
 from astropy.coordinates import Galactic
@@ -32,9 +30,11 @@ class TestStokesMapSimulationComponent:
         assert isinstance(repr(comp), str)
         assert isinstance(str(comp), str)
 
-
     def test_unexpected_param_logging(self):
-        with pytest.raises(ValueError, match="Unexpected simulation parameter: 'bogus' will be ignored."):
+        with pytest.raises(
+            ValueError,
+            match="Unexpected simulation parameter: 'bogus' will be ignored.",
+        ):
             DummyStokesComponent(bogus=123)
 
     def test_set_get_simulation_param(self):

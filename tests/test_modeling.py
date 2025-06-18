@@ -30,7 +30,9 @@ def test1():
     for f in frequencies:
         m = m_sims.stokesMapSimulation()
         m.add_simulation_component(
-            m_sims.pointsrc.pointSource(I=model(f, np.radians(5 / 60) ** 2), fwhm_deg=5 / 60),
+            m_sims.pointsrc.pointSource(
+                I=model(f, np.radians(5 / 60) ** 2), fwhm_deg=5 / 60
+            ),
         )
         m.set_projection((w, shape))
         sim_maps.append(m)
