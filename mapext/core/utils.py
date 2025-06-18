@@ -1,6 +1,7 @@
 """Utility functions for loading various file formats."""
 
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -9,6 +10,7 @@ import toml
 import yaml
 from astropy.io import fits
 
+logger = logging.getLogger(__name__)
 
 def load_fits(file):
     """Load a FITS file and return the data as a NumPy array.
@@ -23,19 +25,24 @@ def load_fits(file):
     np.ndarray
         Data from the FITS file as a NumPy array. If the data is a string, it will be returned as a chararray.
     """
+    logger.debug(f"Loading FITS file: {file}")
     with fits.open(file) as hdul:
         # Use the first HDU with data
         for hdu in hdul:
             if hdu.data is not None:
                 data = hdu.data
+                logger.debug("Found HDU with data")
                 break
         else:
+            logger.warning("No HDU with data found")
             return None  # No HDU had data
 
         array = np.array(data)
+        logger.debug(f"Data loaded, dtype={array.dtype}")
 
         # If all elements are strings, use chararray
         if array.dtype.kind in {"U", "S"}:
+            logger.debug("Data is string-like, converting to chararray")
             return np.char.array(array)
 
         return array
@@ -54,11 +61,14 @@ def load_csv(file):
     np.ndarray
         Data from the CSV file as a NumPy array. If the data is a string, it will be returned as a chararray.
     """
+    logger.debug(f"Loading CSV file: {file}")
     df = pd.read_csv(file)
     array = df.to_numpy()
+    logger.debug(f"CSV loaded, shape={array.shape}, dtype={array.dtype}")
 
     # If all elements are strings, use chararray
     if array.dtype == object and all(isinstance(x, str) for x in array.flat):
+        logger.debug("Data is string-like, converting to chararray")
         return np.char.array(array)
 
     return array
@@ -77,8 +87,11 @@ def load_json(file):
     dict
         Data from the JSON file as a dictionary.
     """
+    logger.debug(f"Loading JSON file: {file}")
     with open(file, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    logger.debug("JSON loaded successfully")
+    return data
 
 
 def load_yaml(file):
@@ -94,8 +107,11 @@ def load_yaml(file):
     dict
         Data from the YAML file as a dictionary.
     """
+    logger.debug(f"Loading YAML file: {file}")
     with open(file, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        data = yaml.safe_load(f)
+    logger.debug("YAML loaded successfully")
+    return data
 
 
 def load_toml(file):
@@ -111,8 +127,11 @@ def load_toml(file):
     dict
         Data from the TOML file as a dictionary.
     """
+    logger.debug(f"Loading TOML file: {file}")
     with open(file, encoding="utf-8") as f:
-        return toml.load(f)
+        data = toml.load(f)
+    logger.debug("TOML loaded successfully")
+    return data
 
 
 DICTLIKE_LOADERS = {
@@ -125,20 +144,46 @@ DICTLIKE_LOADERS = {
 }
 
 
+
 def autoload_dictlike(file: str):
-    """Automatically load dictionary-like data (e.g., JSON, YAML, TOML)."""
+    """Automatically load dictionary-like data (e.g., JSON, YAML, TOML).
+    
+    Parameters
+    ----------
+    file : str
+        Path to the file to be loaded.
+        
+    Returns
+    -------
+    dict
+        Data from the file as a dictionary.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the specified file does not exist.
+    ValueError
+        If the file extension is not supported for dict-like loading.
+    TypeError
+        If the file is not a string or Path object.
+    """
+    logger.debug(f"Auto-loading dict-like file: {file}")
     path = Path(file)
     if not path.exists():
+        logger.error(f"File not found: {file}")
         raise FileNotFoundError(f"File {file} does not exist.")
 
     loader = DICTLIKE_LOADERS.get(path.suffix.lower())
     if not loader:
         supported = ", ".join(DICTLIKE_LOADERS.keys())
+        logger.error(f"Unsupported file extension for dict-like loading: {path.suffix}")
         raise ValueError(
             f"Unsupported file type: {path.suffix}. Supported types for dict-like loading: {supported}"
         )
 
-    return loader(file)
+    data = loader(file)
+    logger.debug(f"File loaded successfully with loader for {path.suffix}")
+    return data
 
 
 ARRAYLIKE_LOADERS = {
@@ -149,16 +194,41 @@ ARRAYLIKE_LOADERS = {
 
 
 def autoload_arraylike(file: str):
-    """Automatically load array-like data (e.g., CSV, FITS) as plain NumPy arrays."""
+    """Automatically load array-like data (e.g., CSV, FITS) as plain NumPy arrays.
+    
+    Parameters
+    ----------
+    file : str
+        Path to the file to be loaded.
+
+    Returns
+    -------
+    np.ndarray
+        Data from the file as a NumPy array. If the data is a string, it will be returned as a chararray.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the specified file does not exist.
+    ValueError
+        If the file extension is not supported for array-like loading.
+    TypeError
+        If the file is not a string or Path object.
+    """
+    logger.debug(f"Auto-loading array-like file: {file}")
     path = Path(file)
     if not path.exists():
+        logger.error(f"File not found: {file}")
         raise FileNotFoundError(f"File {file} does not exist.")
 
     loader = ARRAYLIKE_LOADERS.get(path.suffix.lower())
     if not loader:
         supported = ", ".join(ARRAYLIKE_LOADERS.keys())
+        logger.error(f"Unsupported file extension for array-like loading: {path.suffix}")
         raise ValueError(
             f"Unsupported file type: {path.suffix}. Supported types for array-like loading: {supported}"
         )
 
-    return loader(file)
+    data = loader(file)
+    logger.debug(f"File loaded successfully with loader for {path.suffix}")
+    return data

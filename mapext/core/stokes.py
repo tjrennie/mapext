@@ -4,9 +4,12 @@ Include classes and functions to compute, map, and derive Stokes parameters
 such as I, Q, U, V, P, A, and PF, which are commonly used in polarimetry.
 """
 
+import logging
 from typing import ClassVar
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "StokesComp",
@@ -28,7 +31,6 @@ display_parameters = {
 
 queryable_parameters = list(display_parameters.keys())
 
-
 _hpi = np.pi / 2
 
 
@@ -45,7 +47,7 @@ def wrap_theta(value):
     float
         The wrapped angle value within the range [0, π).
     """
-    return (value) % np.pi
+    return value % np.pi
 
 
 class StokesComp:
@@ -81,57 +83,28 @@ class StokesComp:
     def __init__(self, letter: str):
         letter = letter.upper().strip()  # Normalize input
         if letter not in self._conversion_dict:
+            logger.error(f"Invalid Stokes parameter: {letter}")
             raise ValueError(f"Invalid parameter: {letter}")
         self.letter = letter
 
     def to_int(self):
-        """Convert the Stokes parameter letter to its integer representation.
-
-        Returns
-        -------
-        int
-            The integer representation of the Stokes parameter letter.
-        """
+        """Convert the Stokes parameter letter to its integer representation."""
         return int(self._conversion_dict[self.letter])
 
     def to_float(self):
-        """Convert the Stokes parameter letter to its float representation.
-
-        Returns
-        -------
-        float
-            The float representation of the Stokes parameter letter.
-        """
+        """Convert the Stokes parameter letter to its float representation."""
         return float(self._conversion_dict[self.letter])
 
     def __repr__(self):
-        """Convert the Stokes parameter letter to its string representation.
-
-        Returns
-        -------
-        str
-            The float representation of the Stokes parameter letter.
-        """
+        """Convert the Stokes parameter letter to its string representation."""
         return f"Stokes('{self.letter}')"
 
     def __int__(self):
-        """Convert the Stokes parameter letter to its integer representation.
-
-        Returns
-        -------
-        int
-            The float representation of the Stokes parameter letter.
-        """
+        """Convert the Stokes parameter letter to its integer representation."""
         return self.to_int()
 
     def __float__(self):
-        """Convert the Stokes parameter letter to its float representation.
-
-        Returns
-        -------
-        float
-            The float representation of the Stokes parameter letter.
-        """
+        """Convert the Stokes parameter letter to its float representation."""
         return self.to_float()
 
 
@@ -159,7 +132,7 @@ def get_stokes_value_mapping(
         A function that takes a dictionary of values and returns the mapped value.
     """
     if not use_derived_params:
-        supplied = [_ for _ in supplied if _ not in ["P", "A", "PF"]]
+        supplied = [p for p in supplied if p not in ["P", "A", "PF"]]
 
     mapping_functions = {
         "I": get_I_mapping(),
@@ -172,44 +145,22 @@ def get_stokes_value_mapping(
     }
 
     if required.upper() not in mapping_functions:
+        logger.error(f"Unknown required parameter: {required}")
         raise ValueError(f"Cannot compute '{required}' with the supplied parameters.")
 
+    logger.info(f"Providing mapping function for Stokes parameter '{required.upper()}'")
     return get_derivative_function(mapping_functions[required.upper()], derivative)
 
 
 def get_derivative_function(func, derivative):
-    """Returns the derivative function if requested, else returns the original function.
-
-    Parameters
-    ----------
-    func : function
-        The function to compute the derivative of.
-    derivative : bool
-        Whether to compute the derivative of the function (default is False).
-
-    Returns
-    -------
-    function
-        The original function or its derivative.
-    """
+    """Returns the derivative function if requested, else returns the original function."""
     return get_derivative(func) if derivative else func
 
 
 def get_derivative(func):
-    """Return a function to numerically approximate the derivative of the given function.
-
-    Parameters
-    ----------
-    func : function
-        The function to compute the derivative of.
-
-    Returns
-    -------
-    function
-        A function that takes a dictionary of values and returns the derivative.
-    """
-
+    """Return a function to numerically approximate the derivative of the given function."""
     def derivative_func(**kwargs):
+        logger.debug(f"Computing numerical derivative for: {kwargs}")
         epsilon = 1e-6
         params = kwargs.copy()
         derivatives = {}
@@ -219,7 +170,6 @@ def get_derivative(func):
             f_plus = func(**params)
             params[param] = kwargs[param] - epsilon
             f_minus = func(**params)
-
             derivatives[param] = (f_plus - f_minus) / (2 * epsilon)
 
         return derivatives
@@ -228,36 +178,16 @@ def get_derivative(func):
 
 
 def get_I_mapping():
-    """Return a function to determine the Stokes I parameter.
-
-    Returns
-    -------
-    function
-        A function that takes a dictionary of values and returns the Stokes I parameter.
-    """
-
+    """Return a function to determine the Stokes I parameter."""
     def I_func(**kwargs):
         if "I" in kwargs:
             return kwargs["I"]
         raise ValueError("Missing 'I' parameter.")
-
     return I_func
 
 
 def get_Q_mapping(assume_v_0=True):
-    """Return a function to determine the Stokes Q parameter.
-
-    Parameters
-    ----------
-    assume_v_0 : bool, optional
-        Whether to assume V=0 if not supplied (default is True).
-
-    Returns
-    -------
-    function
-        A function that takes a dictionary of values and returns the Stokes Q parameter.
-    """
-
+    """Return a function to determine the Stokes Q parameter."""
     def Q_func(**kwargs):
         V = kwargs.get("V", 0 if assume_v_0 else None)
 
@@ -268,34 +198,17 @@ def get_Q_mapping(assume_v_0=True):
         if "P" in kwargs and "U" in kwargs and V is not None:
             return np.sqrt(kwargs["P"] ** 2 - (kwargs["U"] ** 2 + V**2))
         if "PF" in kwargs and "I" in kwargs and "U" in kwargs and V is not None:
-            return np.sqrt(
-                (kwargs["PF"] * kwargs["I"]) ** 2 - (kwargs["U"] ** 2 + V**2)
-            )
+            return np.sqrt((kwargs["PF"] * kwargs["I"]) ** 2 - (kwargs["U"] ** 2 + V**2))
         if "PF" in kwargs and "I" in kwargs and "A" in kwargs and np.all(V == 0):
-            return (
-                kwargs["I"] * kwargs["PF"] * np.sqrt(1 - (np.sin(2 * kwargs["A"])) ** 2)
-            )
-        raise ValueError(
-            f"Cannot compute 'Q' with the supplied parameters {kwargs.keys()}."
-        )
+            return kwargs["I"] * kwargs["PF"] * np.sqrt(1 - (np.sin(2 * kwargs["A"])) ** 2)
 
+        logger.warning(f"Failed to compute Q with parameters: {kwargs}")
+        raise ValueError(f"Cannot compute 'Q' with the supplied parameters {kwargs.keys()}.")
     return Q_func
 
 
 def get_U_mapping(assume_v_0=True):
-    """Return a function to determine the Stokes U parameter.
-
-    Parameters
-    ----------
-    assume_v_0 : bool, optional
-        Whether to assume V=0 if not supplied (default is True).
-
-    Returns
-    -------
-    function
-        A function that takes a dictionary of values and returns the Stokes U parameter.
-    """
-
+    """Return a function to determine the Stokes U parameter."""
     def U_func(**kwargs):
         V = kwargs.get("V", 0 if assume_v_0 else None)
 
@@ -306,60 +219,30 @@ def get_U_mapping(assume_v_0=True):
         if "P" in kwargs and "Q" in kwargs and V is not None:
             return np.sqrt(kwargs["P"] ** 2 - (kwargs["Q"] ** 2 + V**2))
         if "PF" in kwargs and "I" in kwargs and "Q" in kwargs and V is not None:
-            return np.sqrt(
-                (kwargs["PF"] * kwargs["I"]) ** 2 - (kwargs["Q"] ** 2 + V**2)
-            )
+            return np.sqrt((kwargs["PF"] * kwargs["I"]) ** 2 - (kwargs["Q"] ** 2 + V**2))
         if "PF" in kwargs and "I" in kwargs and "A" in kwargs and np.all(V == 0):
-            return (
-                kwargs["I"] * kwargs["PF"] * np.sqrt(1 - (np.cos(2 * kwargs["A"])) ** 2)
-            )
-        raise ValueError(
-            f"Cannot compute 'U' with the supplied parameters {kwargs.keys()}."
-        )
+            return kwargs["I"] * kwargs["PF"] * np.sqrt(1 - (np.cos(2 * kwargs["A"])) ** 2)
 
+        logger.warning(f"Failed to compute U with parameters: {kwargs}")
+        raise ValueError(f"Cannot compute 'U' with the supplied parameters {kwargs.keys()}.")
     return U_func
 
 
 def get_V_mapping(assume_v_0=True):
-    """Return a function to determine the Stokes V parameter.
-
-    Parameters
-    ----------
-    assume_v_0 : bool, optional
-        Whether to assume V=0 if not supplied (default is True).
-
-    Returns
-    -------
-    function
-        A function that takes a dictionary of values and returns the Stokes V parameter.
-    """
-
+    """Return a function to determine the Stokes V parameter."""
     def V_func(**kwargs):
         if "V" in kwargs:
             return kwargs["V"]
         if assume_v_0:
+            logger.debug("Assuming V=0 since it was not provided.")
             return 0
-        raise ValueError(
-            f"Cannot compute 'V' with the supplied parameters {kwargs.keys()}."
-        )
-
+        logger.warning("V not supplied and assume_v_0 is False.")
+        raise ValueError(f"Cannot compute 'V' with the supplied parameters {kwargs.keys()}.")
     return V_func
 
 
 def get_P_mapping(assume_v_0=True):
-    """Return a function to determine the total polarisation P parameter.
-
-    Parameters
-    ----------
-    assume_v_0 : bool, optional
-        Whether to assume V=0 if not supplied (default is True).
-
-    Returns
-    -------
-    function
-        A function that takes a dictionary of values and returns the total polarisation P parameter.
-    """
-
+    """Return a function to determine the total polarisation P parameter."""
     def P_func(**kwargs):
         V = kwargs.get("V", 0 if assume_v_0 else None)
 
@@ -369,22 +252,14 @@ def get_P_mapping(assume_v_0=True):
             return np.sqrt(kwargs["Q"] ** 2 + kwargs["U"] ** 2 + V**2)
         if "PF" in kwargs and "I" in kwargs:
             return kwargs["PF"] * kwargs["I"]
-        raise ValueError(
-            f"Cannot compute 'P' with the supplied parameters {kwargs.keys()}."
-        )
 
+        logger.warning(f"Failed to compute P with parameters: {kwargs}")
+        raise ValueError(f"Cannot compute 'P' with the supplied parameters {kwargs.keys()}.")
     return P_func
 
 
 def get_A_mapping():
-    """Return a function to determine the polarisation angle A.
-
-    Returns
-    -------
-    function
-        A function that takes a dictionary of values and returns the polarisation angle A.
-    """
-
+    """Return a function to determine the polarisation angle A."""
     def A_func(**kwargs):
         if "A" in kwargs:
             return kwargs["A"]
@@ -392,27 +267,14 @@ def get_A_mapping():
             if kwargs["Q"] == 0 and kwargs["U"] == 0:
                 return np.nan
             return np.arctan2(kwargs["U"], kwargs["Q"]) / 2
-        raise ValueError(
-            f"Cannot compute 'A' with the supplied parameters {kwargs.keys()}."
-        )
 
+        logger.warning(f"Failed to compute A with parameters: {kwargs}")
+        raise ValueError(f"Cannot compute 'A' with the supplied parameters {kwargs.keys()}.")
     return A_func
 
 
 def get_PF_mapping(assume_v_0=True):
-    """Return a function to determine the polarisation fraction PF.
-
-    Parameters
-    ----------
-    assume_v_0 : bool, optional
-        Whether to assume V=0 if not supplied (default is True).
-
-    Returns
-    -------
-    function
-        A function that takes a dictionary of values and returns the polarisation fraction PF.
-    """
-
+    """Return a function to determine the polarisation fraction PF."""
     def PF_func(**kwargs):
         V = kwargs.get("V", 0 if assume_v_0 else None)
 
@@ -422,8 +284,7 @@ def get_PF_mapping(assume_v_0=True):
             return kwargs["P"] / kwargs["I"]
         if "I" in kwargs and "Q" in kwargs and "U" in kwargs and V is not None:
             return np.sqrt(kwargs["Q"] ** 2 + kwargs["U"] ** 2 + V**2) / kwargs["I"]
-        raise ValueError(
-            f"Cannot compute 'PF' with the supplied parameters {kwargs.keys()}."
-        )
 
+        logger.warning(f"Failed to compute PF with parameters: {kwargs}")
+        raise ValueError(f"Cannot compute 'PF' with the supplied parameters {kwargs.keys()}.")
     return PF_func
