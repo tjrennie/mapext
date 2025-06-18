@@ -4,11 +4,15 @@ Include the `constantPol` class, which models polarisation using
 parameters such as polarisation fraction and polarisation angle.
 """
 
+import logging
+
 import numpy as np
 from astropy.modeling import Parameter
 
 from mapext.core.stokes import StokesComp, wrap_theta
 from mapext.emission.core import FittablePolarisationModel
+
+logger = logging.getLogger(__name__)
 
 
 class constantPol(FittablePolarisationModel):

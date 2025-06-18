@@ -159,6 +159,7 @@ def get_derivative_function(func, derivative):
 
 def get_derivative(func):
     """Return a function to numerically approximate the derivative of the given function."""
+
     def derivative_func(**kwargs):
         logger.debug(f"Computing numerical derivative for: {kwargs}")
         epsilon = 1e-6
@@ -179,15 +180,18 @@ def get_derivative(func):
 
 def get_I_mapping():
     """Return a function to determine the Stokes I parameter."""
+
     def I_func(**kwargs):
         if "I" in kwargs:
             return kwargs["I"]
         raise ValueError("Missing 'I' parameter.")
+
     return I_func
 
 
 def get_Q_mapping(assume_v_0=True):
     """Return a function to determine the Stokes Q parameter."""
+
     def Q_func(**kwargs):
         V = kwargs.get("V", 0 if assume_v_0 else None)
 
@@ -198,17 +202,25 @@ def get_Q_mapping(assume_v_0=True):
         if "P" in kwargs and "U" in kwargs and V is not None:
             return np.sqrt(kwargs["P"] ** 2 - (kwargs["U"] ** 2 + V**2))
         if "PF" in kwargs and "I" in kwargs and "U" in kwargs and V is not None:
-            return np.sqrt((kwargs["PF"] * kwargs["I"]) ** 2 - (kwargs["U"] ** 2 + V**2))
+            return np.sqrt(
+                (kwargs["PF"] * kwargs["I"]) ** 2 - (kwargs["U"] ** 2 + V**2)
+            )
         if "PF" in kwargs and "I" in kwargs and "A" in kwargs and np.all(V == 0):
-            return kwargs["I"] * kwargs["PF"] * np.sqrt(1 - (np.sin(2 * kwargs["A"])) ** 2)
+            return (
+                kwargs["I"] * kwargs["PF"] * np.sqrt(1 - (np.sin(2 * kwargs["A"])) ** 2)
+            )
 
         logger.warning(f"Failed to compute Q with parameters: {kwargs}")
-        raise ValueError(f"Cannot compute 'Q' with the supplied parameters {kwargs.keys()}.")
+        raise ValueError(
+            f"Cannot compute 'Q' with the supplied parameters {kwargs.keys()}."
+        )
+
     return Q_func
 
 
 def get_U_mapping(assume_v_0=True):
     """Return a function to determine the Stokes U parameter."""
+
     def U_func(**kwargs):
         V = kwargs.get("V", 0 if assume_v_0 else None)
 
@@ -219,17 +231,25 @@ def get_U_mapping(assume_v_0=True):
         if "P" in kwargs and "Q" in kwargs and V is not None:
             return np.sqrt(kwargs["P"] ** 2 - (kwargs["Q"] ** 2 + V**2))
         if "PF" in kwargs and "I" in kwargs and "Q" in kwargs and V is not None:
-            return np.sqrt((kwargs["PF"] * kwargs["I"]) ** 2 - (kwargs["Q"] ** 2 + V**2))
+            return np.sqrt(
+                (kwargs["PF"] * kwargs["I"]) ** 2 - (kwargs["Q"] ** 2 + V**2)
+            )
         if "PF" in kwargs and "I" in kwargs and "A" in kwargs and np.all(V == 0):
-            return kwargs["I"] * kwargs["PF"] * np.sqrt(1 - (np.cos(2 * kwargs["A"])) ** 2)
+            return (
+                kwargs["I"] * kwargs["PF"] * np.sqrt(1 - (np.cos(2 * kwargs["A"])) ** 2)
+            )
 
         logger.warning(f"Failed to compute U with parameters: {kwargs}")
-        raise ValueError(f"Cannot compute 'U' with the supplied parameters {kwargs.keys()}.")
+        raise ValueError(
+            f"Cannot compute 'U' with the supplied parameters {kwargs.keys()}."
+        )
+
     return U_func
 
 
 def get_V_mapping(assume_v_0=True):
     """Return a function to determine the Stokes V parameter."""
+
     def V_func(**kwargs):
         if "V" in kwargs:
             return kwargs["V"]
@@ -237,12 +257,16 @@ def get_V_mapping(assume_v_0=True):
             logger.debug("Assuming V=0 since it was not provided.")
             return 0
         logger.warning("V not supplied and assume_v_0 is False.")
-        raise ValueError(f"Cannot compute 'V' with the supplied parameters {kwargs.keys()}.")
+        raise ValueError(
+            f"Cannot compute 'V' with the supplied parameters {kwargs.keys()}."
+        )
+
     return V_func
 
 
 def get_P_mapping(assume_v_0=True):
     """Return a function to determine the total polarisation P parameter."""
+
     def P_func(**kwargs):
         V = kwargs.get("V", 0 if assume_v_0 else None)
 
@@ -254,12 +278,16 @@ def get_P_mapping(assume_v_0=True):
             return kwargs["PF"] * kwargs["I"]
 
         logger.warning(f"Failed to compute P with parameters: {kwargs}")
-        raise ValueError(f"Cannot compute 'P' with the supplied parameters {kwargs.keys()}.")
+        raise ValueError(
+            f"Cannot compute 'P' with the supplied parameters {kwargs.keys()}."
+        )
+
     return P_func
 
 
 def get_A_mapping():
     """Return a function to determine the polarisation angle A."""
+
     def A_func(**kwargs):
         if "A" in kwargs:
             return kwargs["A"]
@@ -269,12 +297,16 @@ def get_A_mapping():
             return np.arctan2(kwargs["U"], kwargs["Q"]) / 2
 
         logger.warning(f"Failed to compute A with parameters: {kwargs}")
-        raise ValueError(f"Cannot compute 'A' with the supplied parameters {kwargs.keys()}.")
+        raise ValueError(
+            f"Cannot compute 'A' with the supplied parameters {kwargs.keys()}."
+        )
+
     return A_func
 
 
 def get_PF_mapping(assume_v_0=True):
     """Return a function to determine the polarisation fraction PF."""
+
     def PF_func(**kwargs):
         V = kwargs.get("V", 0 if assume_v_0 else None)
 
@@ -286,5 +318,8 @@ def get_PF_mapping(assume_v_0=True):
             return np.sqrt(kwargs["Q"] ** 2 + kwargs["U"] ** 2 + V**2) / kwargs["I"]
 
         logger.warning(f"Failed to compute PF with parameters: {kwargs}")
-        raise ValueError(f"Cannot compute 'PF' with the supplied parameters {kwargs.keys()}.")
+        raise ValueError(
+            f"Cannot compute 'PF' with the supplied parameters {kwargs.keys()}."
+        )
+
     return PF_func

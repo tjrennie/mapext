@@ -13,10 +13,14 @@ It includes:
 - compoundFittablePolarisedEmissionModel: A compound model for polarised emission.
 """
 
+import logging
+
 import numpy as np
 from astropy.modeling import CompoundModel, FittableModel
 
 from mapext.core.stokes import StokesComp, wrap_theta
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "FittableEmissionModel",

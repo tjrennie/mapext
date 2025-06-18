@@ -18,6 +18,7 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
+
 def reproject(data, proj1, proj2, shape_out=None, preserve_flux=False):
     """Reproject data from one projection to another.
 

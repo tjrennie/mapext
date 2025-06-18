@@ -12,6 +12,7 @@ from astropy.io import fits
 
 logger = logging.getLogger(__name__)
 
+
 def load_fits(file):
     """Load a FITS file and return the data as a NumPy array.
 
@@ -144,15 +145,14 @@ DICTLIKE_LOADERS = {
 }
 
 
-
 def autoload_dictlike(file: str):
     """Automatically load dictionary-like data (e.g., JSON, YAML, TOML).
-    
+
     Parameters
     ----------
     file : str
         Path to the file to be loaded.
-        
+
     Returns
     -------
     dict
@@ -195,7 +195,7 @@ ARRAYLIKE_LOADERS = {
 
 def autoload_arraylike(file: str):
     """Automatically load array-like data (e.g., CSV, FITS) as plain NumPy arrays.
-    
+
     Parameters
     ----------
     file : str
@@ -224,7 +224,9 @@ def autoload_arraylike(file: str):
     loader = ARRAYLIKE_LOADERS.get(path.suffix.lower())
     if not loader:
         supported = ", ".join(ARRAYLIKE_LOADERS.keys())
-        logger.error(f"Unsupported file extension for array-like loading: {path.suffix}")
+        logger.error(
+            f"Unsupported file extension for array-like loading: {path.suffix}"
+        )
         raise ValueError(
             f"Unsupported file type: {path.suffix}. Supported types for array-like loading: {supported}"
         )

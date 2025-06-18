@@ -149,9 +149,7 @@ class stokesMap:
                     if self.shape is None:
                         self.shape = shape
                     elif self.shape != shape:
-                        raise ValueError(
-                            f"Shape {self.shape} does not match {shape}"
-                        )
+                        raise ValueError(f"Shape {self.shape} does not match {shape}")
                     setattr(
                         self,
                         f"_{stokes_param.upper()}_MAP",
@@ -169,9 +167,7 @@ class stokesMap:
                     if self.shape is None:
                         self.shape = shape
                     elif self.shape != shape:
-                        raise ValueError(
-                            f"Shape {self.shape} does not match {shape}"
-                        )
+                        raise ValueError(f"Shape {self.shape} does not match {shape}")
                     setattr(self, f"_{stokes_param.upper()}_MAP", data)
 
                 else:
@@ -310,7 +306,9 @@ class stokesMap:
         ValueError
             Polarisation convention currently stored is not recognised
         """
-        logger.debug("Switching polarization conventions from: %s", self._pol_convention)
+        logger.debug(
+            "Switching polarization conventions from: %s", self._pol_convention
+        )
         if hasattr(self, "_U"):
             logger.debug("Flipping sign of Stokes U")
             self._U = -1 * self._U
