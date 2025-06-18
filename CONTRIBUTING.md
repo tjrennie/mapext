@@ -17,12 +17,6 @@ If you'd like to **report a bug**, **propose a feature**, or **submit a general 
   - [Linting](#linting)
   - [Git Commit Scope](#git-commit-scope)
   - [Formatting Commit Messages](#formatting-commit-messages)
-    - [Revert](#revert)
-    - [Type](#type)
-    - [Scope](#scope)
-    - [Subject](#subject)
-    - [Body](#body)
-    - [Footer](#footer)
   - [Pulling Your Changes into the Main Branch](#pulling-your-changes-into-the-main-branch)
 
 ---
