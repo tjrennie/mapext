@@ -10,13 +10,15 @@ readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Thomas J. Rennie" }]
 dependencies = [
-  "numpy",
-  "matplotlib",
-  "healpy",
   "astropy",
   "astropy-healpix",
+  "healpy",
+  "matplotlib",
+  "numpy",
+  "pandas",
   "pyyaml",
-  "reproject"
+  "reproject",
+  "toml"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
