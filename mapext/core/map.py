@@ -5,6 +5,8 @@ with various projections and polarization conventions. Compatible with other
 package functions.
 """
 
+import logging
+
 import astropy.constants as astropy_const
 import astropy.units as astropy_u
 import healpy as hp
@@ -16,6 +18,8 @@ from astropy_healpix import HEALPix
 
 from mapext.core.projection import reproject
 from mapext.core.stokes import get_stokes_value_mapping, queryable_parameters
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["stokesMap"]
 
@@ -35,6 +39,7 @@ class stokesMap:
         **kwargs : dict
             Keyword arguments for specifying maps or other initialization options.
         """
+        logger.debug("Initializing stokesMap with assume_v_0=%s", assume_v_0)
         self.assume_v_0 = assume_v_0
         self.params_supplied = []
 
@@ -47,10 +52,12 @@ class stokesMap:
 
         # CASE 1: Keyword arguments provided to specify maps
         if kwargs:
+            logging.info("Loading map data from keyword arguments.")
             self.load_from_kwargs(**kwargs)
 
         # CASE 2: Loadfile provided to specify maps
         elif (len(args) == 1) and isinstance(args[0], str):
+            logging.info("Loading map data from file: %s", args[0])
             self.load_from_file(args[0])
 
     # ==========================================================================
@@ -77,10 +84,16 @@ class stokesMap:
         kwargs : dict
             Additional keyword arguments for specifying maps or other options.
         """
+        logger.debug("Loading data via kwargs: %s", list(kwargs.keys()))
         for param in kwargs.keys():
             if (param.upper() in queryable_parameters) and (kwargs[param] is not None):
                 self.params_supplied.append(param.upper())
                 setattr(self, f"_{param.upper()}", kwargs[param])
+            else:
+                logger.error("Unrecognized parameter: %s", param)
+                raise ValueError(
+                    f"Parameter {param} not recognised or not supported by stokesMap."
+                )
 
     def load_from_file(self, filename):
         """Load map data from a filename.
@@ -95,15 +108,20 @@ class stokesMap:
         ValueError
             Projection type not supported yet by code
         """
+        logger.debug("Reading map file: %s", filename)
         with open(filename) as f:
             load_data = yaml.safe_load(f)
 
         # Load frequency information if supplied
         if "frequency" in load_data:
+            logger.debug("Found frequency in file.")
             if isinstance(load_data["frequency"], dict):
                 self.frequency = load_data["frequency"]["center"] * astropy_u.Hz
             elif isinstance(load_data["frequency"], float):
                 self.frequency = load_data["frequency"] * astropy_u.Hz
+            logger.info(
+                "Frequency loaded from file: %s Hz", self.frequency.to(astropy_u.Hz)
+            )
 
         # Load wavelength information if supplied
         if "wavelength" in load_data:
@@ -111,6 +129,9 @@ class stokesMap:
                 self.wavelength = load_data["frequency"]["center"] * astropy_u.m
             elif isinstance(load_data["wavelength"], float):
                 self.wavelength = load_data["wavelength"] * astropy_u.m
+            logger.info(
+                "Wavelength loaded from file: %s m", self.wavelength.to(astropy_u.m)
+            )
 
         for stokes_param, stokes_dict in load_data["stokes"].items():
             # Load data array
@@ -122,11 +143,13 @@ class stokesMap:
                     if self.projection is None:
                         self.projection = proj
                     elif self.projection != proj:
-                        print("do stuff1")
+                        raise ValueError(
+                            f"Projection {self.projection} does not match {proj}"
+                        )
                     if self.shape is None:
                         self.shape = shape
                     elif self.shape != shape:
-                        print("do stuff2")
+                        raise ValueError(f"Shape {self.shape} does not match {shape}")
                     setattr(
                         self,
                         f"_{stokes_param.upper()}_MAP",
@@ -138,11 +161,13 @@ class stokesMap:
                     if self.projection is None:
                         self.projection = proj
                     elif self.projection != proj:
-                        print("do stuff1")
+                        raise ValueError(
+                            f"Projection {self.projection} does not match {proj}"
+                        )
                     if self.shape is None:
                         self.shape = shape
                     elif self.shape != shape:
-                        print("do stuff2")
+                        raise ValueError(f"Shape {self.shape} does not match {shape}")
                     setattr(self, f"_{stokes_param.upper()}_MAP", data)
 
                 else:
@@ -155,10 +180,20 @@ class stokesMap:
                     )
                     d[d == stokes_dict["data"]["nullval"]] = np.nan
                     setattr(self, f"_{stokes_param.upper()}_MAP", d)
+                    logger.info(
+                        "Loaded %s map with null value %s set to nan",
+                        stokes_param.upper(),
+                        stokes_dict["data"]["nullval"],
+                    )
                 self.params_supplied.append(stokes_param.upper())
 
             # Load uncertainty array if supplied
             if "uncertainty" in stokes_dict:
+                logging.info(
+                    "Loading uncertainty data for %s from %s",
+                    stokes_param.upper(),
+                    stokes_dict["uncertainty"]["filename"],
+                )
                 projection = stokes_dict["data"].get("projection", "WCS")
                 if projection.upper() in ["WCS", "CAR"]:
                     setattr(
@@ -171,6 +206,12 @@ class stokesMap:
                         self,
                         f"_{stokes_param.upper()}_UNC",
                         hp.read_map(stokes_dict["uncertainty"]["filename"]),
+                    )
+                else:
+                    logger.warning(
+                        "Uncertainty data provided for %s but projection %s not supported. Proceding without uncertainty maps.",
+                        stokes_param.upper(),
+                        projection,
                     )
 
     # ==========================================================================
@@ -265,12 +306,17 @@ class stokesMap:
         ValueError
             Polarisation convention currently stored is not recognised
         """
+        logger.debug(
+            "Switching polarization conventions from: %s", self._pol_convention
+        )
         if hasattr(self, "_U"):
+            logger.debug("Flipping sign of Stokes U")
             self._U = -1 * self._U
         if hasattr(self, "_A"):
+            logger.debug("Flipping sign of polarization angle A")
             self._A = -1 * self._A
         else:
-            print("No Stokes U or polarization angle data to switch")
+            logger.warning("No Stokes U or polarization angle data to switch")
 
         if self._pol_convention == "COSMO":
             self._pol_convention = "IAU"
@@ -322,6 +368,7 @@ class stokesMap:
         kwargs : dict
             Additional keyword arguments for WCS or HEALPix configuration.
         """
+        logger.debug("Setting new projection: %s", type(proj).__name__)
         # Validate the input
         if isinstance(proj, HEALPix):
             new_projection = proj
@@ -339,6 +386,7 @@ class stokesMap:
         for stokes in self.params_supplied:
             stokes_map = getattr(self, f"_{stokes}_MAP")
             if stokes_map is not None:
+                logger.debug("Reprojecting %s map to new projection", stokes)
                 if isinstance(new_projection, HEALPix):
                     stokes_map = reproject(stokes_map, self.projection, new_projection)
                 elif isinstance(new_projection, WCS):
@@ -421,6 +469,7 @@ class stokesMap:
         ValueError
             Please give frequency as either an astropy quantity, or as a float (see docs for details of interpretation)
         """
+        logger.debug("Setting frequency to: %s", new_frequency)
         self._wavelength = None
         if new_frequency is None:
             self._frequency = None
@@ -428,10 +477,10 @@ class stokesMap:
             self._frequency = new_frequency.to(astropy_u.Hz)
         elif isinstance(new_frequency, float) or isinstance(new_frequency, int):
             if new_frequency < 1e6:
-                print("Assuming frequency has been given in GHz")
+                logger.warning("Assuming frequency has been given in GHz")
                 self._frequency = new_frequency * 1e9 * astropy_u.Hz
             elif new_frequency >= 1e6:
-                print("Assuming frequency has been given in Hz")
+                logger.warning("Assuming frequency has been given in Hz")
                 self._frequency = new_frequency * astropy_u.Hz
         else:
             raise ValueError(
@@ -452,6 +501,7 @@ class stokesMap:
         ValueError
             Please give wavelength as either an astropy quantity, or as a float (see docs for details of interpretation)
         """
+        logger.debug("Setting wavelength to: %s", new_wavelength)
         self._frequency = None
         if new_wavelength is None:
             self._wavelength = None
@@ -459,10 +509,10 @@ class stokesMap:
             self._wavelength = new_wavelength.to(astropy_u.m)
         elif isinstance(new_wavelength, float) or isinstance(new_wavelength, int):
             if new_wavelength > 1e-2:
-                print("Assuming wavelength has been given in m")
+                logger.warning("Assuming wavelength has been given in m")
                 self._wavelength = new_wavelength * astropy_u.m
             elif new_wavelength <= 1e-2:
-                print("Assuming frequency has been given in um")
+                logger.warning("Assuming frequency has been given in um")
                 self._wavelength = new_wavelength * 1e-6 * astropy_u.m
         else:
             raise ValueError(
@@ -473,6 +523,7 @@ class stokesMap:
     # stokes component properties
     def _get_stokes_map(self, stokes_type):
         """Helper to generate a Stokes map of the specified type."""
+        logger.debug("Accessing Stokes map for type: %s", stokes_type)
         func = get_stokes_value_mapping(
             stokes_type,
             self.params_supplied,

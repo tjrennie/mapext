@@ -4,6 +4,8 @@ Include functions to extract fittable polarised models, format axes for
 Stokes parameters, and plot various visualizations such as IPA and IQU plots.
 """
 
+import logging
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -12,6 +14,8 @@ from mapext.emission.core import (
     compoundFittablePolarisedEmissionModel,
     fittablePolarisedEmissionModel,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def extract_fittable_polarised_models(model):

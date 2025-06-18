@@ -10,11 +10,15 @@ Each model is implemented as a subclass of FittableEmissionModel with evaluation
 and derivative methods for fitting purposes.
 """
 
+import logging
+
 import astropy.constants as astropy_c
 import numpy as np
 from astropy.modeling import Parameter
 
 from mapext.emission.core import FittableEmissionModel
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ame_lognormal",

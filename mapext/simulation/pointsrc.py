@@ -3,6 +3,8 @@
 Simulate point sources using HEALPix and WCS projections.
 """
 
+import logging
+
 import healpy as hp
 import numpy as np
 from astropy.coordinates import SkyCoord
@@ -10,6 +12,8 @@ from astropy.wcs import WCS
 from astropy_healpix import HEALPix
 
 from mapext.simulation.core import stokesMapSimulationComponent
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "pointSource",
@@ -71,6 +75,10 @@ class pointSource(stokesMapSimulationComponent):
         dict
             A dictionary containing the generated map with the point source.
         """
+        logger.debug(
+            f"Starting point source simulation with projection type: {type(self._projection).__name__}"
+        )
+
         peak_intensity = {
             name: value
             for name, value in {
@@ -95,10 +103,12 @@ class pointSource(stokesMapSimulationComponent):
             ptsrc = self._generate_wcs_point_source(source_coords)
 
         else:
+            logger.error(f"Invalid source_coords format: {source_coords}")
             raise ValueError("Projection must be either HEALPix or WCS")
 
         # Convolve the point source map with a Gaussian kernel if fwhm_deg is provided
         if fwhm_deg is not None:
+            logger.debug(f"Applying Gaussian smoothing with FWHM: {fwhm_deg} degrees")
             if isinstance(self._projection, HEALPix):
                 ptsrc = hp.smoothing(ptsrc, fwhm=fwhm_deg * np.pi / 180.0)
             elif isinstance(self._projection, WCS):
@@ -116,6 +126,10 @@ class pointSource(stokesMapSimulationComponent):
                 outputs["A"] = np.ones(self._shape_out) * val
             else:
                 outputs[comp] = ptsrc * (val / np.nanmax(ptsrc))
+
+        logger.info(
+            f"Point source simulation complete with components: {list(outputs.keys())}"
+        )
 
         return outputs
 
@@ -187,6 +201,8 @@ class pointSource(stokesMapSimulationComponent):
         # Set the intensity at the specified pixel
         map_data[pix] += 1
 
+        logger.debug(f"Generated HEALPix point source at pixel index: {pix}")
+
         return map_data
 
     def _generate_wcs_point_source(self, source_coords):
@@ -247,5 +263,9 @@ class pointSource(stokesMapSimulationComponent):
 
         # Place the point source at the specified pixel
         map_data[int(y), int(x)] += 1
+
+        logger.debug(
+            f"Generated WCS point source at pixel coordinates: ({int(x)}, {int(y)})"
+        )
 
         return map_data

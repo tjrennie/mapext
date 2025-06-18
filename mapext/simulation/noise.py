@@ -3,12 +3,16 @@
 Simulate white noise using HEALPix and WCS projections.
 """
 
+import logging
+
 import healpy as hp
 import numpy as np
 from astropy.wcs import WCS
 from astropy_healpix import HEALPix
 
 from mapext.simulation.core import stokesMapSimulationComponent
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "coloredNoise",
@@ -33,6 +37,10 @@ def generate_hpx_colored_noise(col=-1, rms=1, nside=32):
     numpy.ndarray
         HEALPix map with colored noise.
     """
+    logger.debug(
+        f"Generating HEALPix colored noise (col={col}, rms={rms}, nside={nside})"
+    )
+
     lmax = 3 * nside - 1
     ell = np.arange(lmax + 1, dtype=np.float64)
 
@@ -41,6 +49,8 @@ def generate_hpx_colored_noise(col=-1, rms=1, nside=32):
 
     alm = hp.synalm(cl, lmax=lmax, new=True)
     map_1f = hp.alm2map(alm, nside=nside, lmax=lmax, verbose=False)
+
+    logger.debug("HEALPix noise map generated and normalized")
 
     return map_1f * (rms / np.std(map_1f))
 
@@ -62,6 +72,8 @@ def generate_wcs_colored_noise(col=-1, rms=1, shape=(101, 101)):
     numpy.ndarray
         WCS map with colored noise.
     """
+    logger.debug(f"Generating WCS colored noise (col={col}, rms={rms}, shape={shape})")
+
     rows, cols = shape
     fx = np.fft.fftfreq(cols).reshape(1, cols)
     fy = np.fft.fftfreq(rows).reshape(rows, 1)
@@ -74,6 +86,8 @@ def generate_wcs_colored_noise(col=-1, rms=1, shape=(101, 101)):
     spectrum = amplitude * (np.cos(phase) + 1j * np.sin(phase))
 
     map_1f = np.fft.ifft2(spectrum).real
+
+    logger.debug("WCS noise map generated and normalized")
 
     return map_1f * (rms / np.std(map_1f))
 
@@ -130,8 +144,10 @@ class whiteNoise(stokesMapSimulationComponent):
         dict
             A dictionary containing the generated noise maps for each Stokes parameter.
         """
+        logger.info("Starting white noise simulation")
         if (seed is not None) and (all_maps_seeded is False):
             np.random.seed(seed)
+            logger.debug(f"Random seed set to {seed}")
 
         defined_rms = {
             name: value
@@ -148,10 +164,12 @@ class whiteNoise(stokesMapSimulationComponent):
         }
         if self.assume_v_0:
             defined_rms["V"] = 0.0
+            logger.debug("Assuming V=0, V RMS set to 0")
 
         outputs = {}
 
         if isinstance(self._projection, HEALPix):
+            logger.debug("Using HEALPix projection")
             for comp, rms in defined_rms.items():
                 if (seed is not None) and (all_maps_seeded is True):
                     np.random.seed(seed)
@@ -162,6 +180,7 @@ class whiteNoise(stokesMapSimulationComponent):
                 )
 
         elif isinstance(self._projection, WCS):
+            logger.debug("Using WCS projection")
             for comp, rms in defined_rms.items():
                 if (seed is not None) and (all_maps_seeded is True):
                     np.random.seed(seed)
@@ -172,8 +191,10 @@ class whiteNoise(stokesMapSimulationComponent):
                 )
 
         else:
+            logger.error("Invalid projection type")
             raise ValueError("Projection must be either HEALPix or WCS")
 
+        logger.info("White noise simulation completed")
         return outputs
 
 
@@ -232,8 +253,11 @@ class coloredNoise(stokesMapSimulationComponent):
         dict
             A dictionary containing the generated noise maps for each Stokes parameter.
         """
+        logger.info("Starting colored noise simulation")
+
         if (seed is not None) and (all_maps_seeded is False):
             np.random.seed(seed)
+            logger.debug(f"Random seed set to {seed}")
 
         defined_rms = {
             name: value
@@ -250,10 +274,12 @@ class coloredNoise(stokesMapSimulationComponent):
         }
         if self.assume_v_0:
             defined_rms["V"] = 0.0
+            logger.debug("Assuming V=0, V RMS set to 0")
 
         outputs = {}
 
         if isinstance(self._projection, HEALPix):
+            logger.debug("Using HEALPix projection")
             for comp, rms in defined_rms.items():
                 if (seed is not None) and (all_maps_seeded is True):
                     np.random.seed(seed)
@@ -264,6 +290,7 @@ class coloredNoise(stokesMapSimulationComponent):
                 )
 
         elif isinstance(self._projection, WCS):
+            logger.debug("Using WCS projection")
             for comp, rms in defined_rms.items():
                 if (seed is not None) and (all_maps_seeded is True):
                     np.random.seed(seed)
@@ -274,6 +301,8 @@ class coloredNoise(stokesMapSimulationComponent):
                 )
 
         else:
+            logger.error("Invalid projection type")
             raise ValueError("Projection must be either HEALPix or WCS")
 
+        logger.info("Colored noise simulation completed")
         return outputs

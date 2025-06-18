@@ -43,3 +43,17 @@ exclude_patterns = []
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+
+# -- MyST Parser configuration -----------------------------------------------
+# https://myst-parser.readthedocs.io/en/latest/sphinx-extensions.html
+myst_heading_anchors = 3
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
+    "html_admonition",
+    "html_image",
+    "linkify",
+    "replacements",
+    "substitution",
+    "tasklist",
+]

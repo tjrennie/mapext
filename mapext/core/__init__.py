@@ -1,3 +1,8 @@
-from .map import *
-from .projection import *
-from .stokes import *
+from . import map, projection, stokes, utils
+
+__all__ = ["map", "projection", "stokes", "utils"]
+
+import logging
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())

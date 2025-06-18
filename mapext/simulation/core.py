@@ -6,7 +6,7 @@ specified parameters and projections.
 """
 
 import inspect
-import warnings
+import logging
 
 import numpy as np
 from astropy.wcs import WCS
@@ -14,6 +14,8 @@ from astropy_healpix import HEALPix
 
 from mapext.core.map import stokesMap
 from mapext.core.stokes import get_stokes_value_mapping, wrap_theta
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "stokesMapSimulation",
@@ -51,7 +53,7 @@ class stokesMapSimulationComponent:
         # Handle unexpected keys
         for key in kwargs.keys():
             if key not in expected_keys:
-                warnings.warn(
+                raise ValueError(
                     f"Unexpected simulation parameter: '{key}' will be ignored."
                 )
 
@@ -60,6 +62,9 @@ class stokesMapSimulationComponent:
             self._simulation_parameters[key] = kwargs.get(
                 key, self._default_simulation_params[key]
             )
+        logger.info(
+            f"{self.__class__.__name__} initialized with assume_v_0={assume_v_0}"
+        )
 
     def __repr__(self) -> str:
         repr_str = f"<{self.__class__.__name__}("
@@ -129,6 +134,9 @@ class stokesMapSimulationComponent:
                 self.reset_cached_maps()
         else:
             super().__setattr__(name, value)
+        logger.debug(
+            f"Updated simulation parameter '{name}' to {value}, resetting cached maps"
+        )
 
     def __getattr__(self, name):
         """Get an attribute of the class.
@@ -223,6 +231,7 @@ class stokesMapSimulationComponent:
         ValueError
             If the projection format is invalid.
         """
+        logger.info(f"Setting projection: {type(projection).__name__}")
         self.reset_cached_maps()
 
         if isinstance(projection, HEALPix):
@@ -238,16 +247,20 @@ class stokesMapSimulationComponent:
             raise ValueError(
                 "Projection must be a HEALPix object or a tuple (WCS, array shape)."
             )
+        logger.debug(f"New output shape: {self._shape_out}")
 
     def generate_simulation(self):
         """Generate simulated components.
 
         This method generates the simulated components required for the simulation. It uses the parameters supplied to the class to generate the components and stores them in the class instance.
         """
+        logger.info("Generating simulation components...")
+        logger.debug(f"Simulation parameters: {self._simulation_parameters}")
         sim_components = self.run_simulation(**self._simulation_parameters)
         for key, value in sim_components.items():
             setattr(self, f"_{key}_MAP", value)
             self.params_supplied.append(key)
+        logger.debug(f"Simulated keys: {list(sim_components.keys())}")
         self._maps_cached = True
 
     def run_simulation(self) -> dict:
@@ -263,6 +276,7 @@ class stokesMapSimulationComponent:
         NotImplementedError
             If the method is not implemented in a subclass.
         """
+        logger.error("run_simulation not implemented in subclass")
         raise NotImplementedError("Subclasses must implement this method.")
 
     # ==========================================================================
@@ -385,6 +399,7 @@ class stokesMapSimulation(stokesMap):
             )
         self.simulation_components.append(component)
         self.update_component_projections()
+        logger.info(f"Added simulation component: {component.__class__.__name__}")
 
     def update_component_projections(self, proj=None, map_shape=None, **kwargs):
         """Update the projection for all simulation components."""
@@ -467,6 +482,8 @@ class stokesMapSimulation(stokesMap):
         ValueError
             If the stokes_type is not valid.
         """
+        logger.info(f"Generating Stokes map: {stokes_type}")
+        logger.debug(f"Number of components: {len(self.simulation_components)}")
         if stokes_type not in {"I", "Q", "U", "V", "P", "A", "PF"}:
             raise ValueError(f"Invalid Stokes type: {stokes_type}")
 
@@ -509,5 +526,8 @@ class stokesMapSimulation(stokesMap):
                 else:
                     combined_P += np.array(getattr(component, "P"), copy=True)
             combined_map = (combined_P / np.sqrt(combined_Q**2 + combined_U**2)) * 100
+
+        else:
+            logger.error(f"Invalid Stokes type requested: {stokes_type}")
 
         return combined_map
