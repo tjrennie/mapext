@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 import pytest
 from astropy.coordinates import Galactic
@@ -9,7 +11,7 @@ from mapext.simulation import stokesMapSimulation, stokesMapSimulationComponent
 
 # Dummy subclass to override run_simulation
 class DummyStokesComponent(stokesMapSimulationComponent):
-    def run_simulation(self, I=1):
+    def run_simulation(self, test_param=10):
         shape = self.shape or (5,)
         return {
             "I": np.ones(shape),
@@ -25,12 +27,14 @@ class DummyStokesComponent(stokesMapSimulationComponent):
 # Test class for stokesMapSimulationComponent
 class TestStokesMapSimulationComponent:
     def test_repr_str(self):
+        DummyStokesComponent._default_simulation_params = {"test_param": 0}
         comp = DummyStokesComponent(test_param=42)
         assert isinstance(repr(comp), str)
         assert isinstance(str(comp), str)
 
-    def test_unexpected_param_warning(self):
-        with pytest.warns(UserWarning, match="Unexpected simulation parameter"):
+
+    def test_unexpected_param_logging(self):
+        with pytest.raises(ValueError, match="Unexpected simulation parameter: 'bogus' will be ignored."):
             DummyStokesComponent(bogus=123)
 
     def test_set_get_simulation_param(self):
