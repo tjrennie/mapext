@@ -32,6 +32,8 @@ docs = [
   "sphinx_rtd_theme",
   "ghp-import",
   "myst-parser",
+  "mdurl",
+  "linkify-it-py",
 ]
 
 # Development dependencies for testing and code quality tools
