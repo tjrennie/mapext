@@ -6,9 +6,6 @@ For the full list of built-in configuration values, see the documentation:
 https://www.sphinx-doc.org/en/master/usage/configuration.html
 """
 
-# import sys, os
-# sys.path.insert(0, os.path.abspath('../..'))
-
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -31,18 +28,33 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "sphinxcontrib.bibtex",
     "myst_parser",
 ]
 
 templates_path = ["_templates"]
 exclude_patterns = []
 
-
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+html_theme_options = {
+    "logo_only": True,
+}
+html_logo = "_static/mapext_logo.png"
+
+# -- Autodoc configuration ---------------------------------------------------
+# https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html
+autodoc_default_options = {
+    "members": True,
+    "undoc-members": True,
+    "show-inheritance": True,
+    "member-order": "bysource",
+    "special-members": "__init__",
+}
+suppress_warnings = ["duplicate.object"]
 
 # -- MyST Parser configuration -----------------------------------------------
 # https://myst-parser.readthedocs.io/en/latest/sphinx-extensions.html
@@ -57,3 +69,10 @@ myst_enable_extensions = [
     "substitution",
     "tasklist",
 ]
+
+# -- BibTeX configuration ---------------------------------------------------
+# https://sphinxcontrib-bibtex.readthedocs.io/en/latest/
+bibtex_bibfiles = ["_static/references.bib"]
+bibtex_default_style = "author_year"
+bibtex_cite_style = "author_year"
+bibtex_reference_style = "author_year"

@@ -35,12 +35,15 @@ class synchrotron_1comp(FittableEmissionModel):
 
     Defined as
 
-        .. math::
-            S^\\mathrm{\\,sync}_\\nu = S1 \\nu^\\alpha,
+    .. math::
 
-    where S1 is the synchrotron amplitude at 1 GHz and alpha is the spectral index [1]_.
+        S_{\nu}^{\mathrm{sync}} = S_{1} \nu^{\alpha},
 
-    .. [1] Carol, B.W., Oslie, D.A., 2007, An Introduction to Modern Astrophysics, 2 edn. Cambridge Univerity Press, Cambridge, UK
+    where :math:`S_{1}` is the synchrotron amplitude at 1 GHz and :math:`\alpha` is the spectral index (E.G. Carroll and Ostlie 1996).
+
+    References
+    ----------
+    Carroll, B. W., & Ostlie, D. A. (1996). *An Introduction to Modern Astrophysics*. Addison-Wesley.
     """
 
     synch_S1 = Parameter(default=0.01, min=0, description="Synchrotron flux at 1 GHz")
@@ -97,32 +100,33 @@ class synchrotron_1comp(FittableEmissionModel):
 class freeFree_7500k(FittableEmissionModel):
     r"""Emission model for free-free emission with an electron temperature of 7500 K.
 
-    Where the free-free optical depth (:math:`\\tau^\mathrm{ff}`) is defined as
+    This class represents a version of the Draine (2011) free-free emission model.
 
-        .. math::
-            \\tau^\\mathrm{ff}_\\nu = 5.468\\times 10^{-2} \\cdot T_e^{-\\frac{3}{2}} \\left[ \\frac{\\nu}{\\mathrm{GHz}} \\right]^{-2} \\left[\\frac{EM}{\\mathrm{pc\\,cm}^-6}\\right]  g^\\mathrm{ff}_\\nu
+    Where the free-free optical depth (:math:`\tau^\mathrm{ff}`) is defined as
 
-    where :math:`T_e` is the electron tempertature (assumed to be 7500 K), :math:`\\nu` is defined as the frequency of observation, :math:`\\mathrm{EM}` is the emission measure, and :math:`g_\\nu^\mathrm{ff}` the Gaunt factor. The Gaunt factor is then defined as
+    .. math::
+        \tau^\mathrm{ff}_\nu = 5.468\times 10^{-2} \cdot T_e^{-\frac{3}{2}} \left[ \frac{\nu}{\mathrm{GHz}} \right]^{-2} \left[\frac{EM}{\mathrm{pc\,cm}^-6}\right]  g^\mathrm{ff}_\nu
 
-        .. math::
-            g^\\mathrm{ff}_\\nu = \\ln\\left(\\exp\\left\\{5.90 - \\frac{\\sqrt{3}}{\\pi}\\ln\\left(\\left[ \\frac{\\nu}{\\mathrm{GHz}} \\right] \\left[\\frac{T_e}{10^4\\,\\mathrm{K}}\\right] ^\\frac{3}{2}\\right)\\right\\} + 2.71828\\right),
+    where :math:`T_e` is the electron temperature (assumed to be 7500 K), :math:`\nu` is defined as the frequency of observation, :math:`\mathrm{EM}` is the emission measure, and :math:`g_\nu^\mathrm{ff}` the Gaunt factor. The Gaunt factor is then defined as
 
-    and the brightness temperature (:math:`T_\\nu^\\mathrm{ff}`) then defined as
+    .. math::
+        g^\mathrm{ff}_\nu = \ln\left(\exp\left\{5.90 - \frac{\sqrt{3}}{\pi}\ln\left(\left[ \frac{\nu}{\mathrm{GHz}} \right] \left[\frac{T_e}{10^4\,\mathrm{K}}\right] ^\frac{3}{2}\right)\right\} + 2.71828\right),
 
-        .. math::
-            T^\\mathrm{ff}_\\nu = T_e \\left(1-e^{-\\tau^\\mathrm{ff}_\\nu}\\right).
+    and the brightness temperature (:math:`T_\nu^\mathrm{ff}`) then defined as
+
+    .. math::
+        T^\mathrm{ff}_\nu = T_e \left(1-e^{-\tau^\mathrm{ff}_\nu}\right).
 
     To convert this to Janskys, we then assume the mean is filled by emission and convert using
 
-        .. math::
-            S^\\mathrm{ff}_\\nu = \\frac{2k_B\\Omega\\nu^2}{c^2} T^\\mathrm{ff}_\\nu,
+    .. math::
+        S^\mathrm{ff}_\nu = \frac{2k_B\Omega\nu^2}{c^2} T^\mathrm{ff}_\nu,
 
-    where :math:`S^\\mathrm{ff}_\\nu` is the flux density in Janskys, :math:`\\Omega` is the beam solid angle, and all other symbols have their usual meanings
+    where :math:`S^\mathrm{ff}_\nu` is the flux density in Janskys, :math:`\Omega` is the beam solid angle, and all other symbols have their usual meanings.
 
     References
     ----------
-    .. [1] Draine, B.T. (2011) https://ui.adsabs.harvard.edu/abs/2011piim.book.....D/abstract
-    .. [2] Carol, B.W., Oslie, D.A., 2007, An Introduction to Modern Astrophysics, 2 edn. Cambridge Univerity Press, Cambridge, UK
+    Draine, B. T. (2011). *Physics of the Interstellar and Intergalactic Medium*. Princeton University Press.
     """
 
     ff_em = Parameter(default=100, min=0, description="Free-free emission measure")
@@ -214,32 +218,33 @@ class freeFree_7500k(FittableEmissionModel):
 class freeFree(FittableEmissionModel):
     r"""Emission model for free-free emission without assumed electron temperature.
 
-    Where the free-free optical depth (:math:`\\tau^\mathrm{ff}`) is defined as
+    This class represents a version of the Draine (2011) free-free emission model.
 
-        .. math::
-            \\tau^\\mathrm{ff}_\\nu = 5.468\\times 10^{-2} \\cdot T_e^{-\\frac{3}{2}} \\left[ \\frac{\\nu}{\\mathrm{GHz}} \\right]^{-2} \\left[\\frac{EM}{\\mathrm{pc\\,cm}^-6}\\right]  g^\\mathrm{ff}_\\nu
+    Where the free-free optical depth (:math:`\tau^\mathrm{ff}`) is defined as
 
-    where :math:`T_e` is the electron tempertature, :math:`\\nu` is defined as the frequency of observation, :math:`\\mathrm{EM}` is the emission measure, and :math:`g_\\nu^\mathrm{ff}` the Gaunt factor. The Gaunt factor is then defined as
+    .. math::
+        \tau^\mathrm{ff}_\nu = 5.468\times 10^{-2} \cdot T_e^{-\frac{3}{2}} \left[ \frac{\nu}{\mathrm{GHz}} \right]^{-2} \left[\frac{EM}{\mathrm{pc\,cm}^-6}\right]  g^\mathrm{ff}_\nu
 
-        .. math::
-            g^\\mathrm{ff}_\\nu = \\ln\\left(\\exp\\left\\{5.90 - \\frac{\\sqrt{3}}{\\pi}\\ln\\left(\\left[ \\frac{\\nu}{\\mathrm{GHz}} \\right] \\left[\\frac{T_e}{10^4\\,\\mathrm{K}}\\right] ^\\frac{3}{2}\\right)\\right\\} + 2.71828\\right),
+    where :math:`T_e` is the electron temperature, :math:`\nu` is defined as the frequency of observation, :math:`\mathrm{EM}` is the emission measure, and :math:`g_\nu^\mathrm{ff}` the Gaunt factor. The Gaunt factor is then defined as
 
-    and the brightness temperature (:math:`T_\\nu^\\mathrm{ff}`) then defined as
+    .. math::
+        g^\mathrm{ff}_\nu = \ln\left(\exp\left\{5.90 - \frac{\sqrt{3}}{\pi}\ln\left(\left[ \frac{\nu}{\mathrm{GHz}} \right] \left[\frac{T_e}{10^4\,\mathrm{K}}\right] ^\frac{3}{2}\right)\right\} + 2.71828\right),
 
-        .. math::
-            T^\\mathrm{ff}_\\nu = T_e \\left(1-e^{-\\tau^\\mathrm{ff}_\\nu}\\right).
+    and the brightness temperature (:math:`T_\nu^\mathrm{ff}`) then defined as
+
+    .. math::
+        T^\mathrm{ff}_\nu = T_e \left(1-e^{-\tau^\mathrm{ff}_\nu}\right).
 
     To convert this to Janskys, we then assume the mean is filled by emission and convert using
 
-        .. math::
-            S^\\mathrm{ff}_\\nu = \\frac{2k_B\\Omega\\nu^2}{c^2} T^\\mathrm{ff}_\\nu,
+    .. math::
+        S^\mathrm{ff}_\nu = \frac{2k_B\Omega\nu^2}{c^2} T^\mathrm{ff}_\nu,
 
-    where :math:`S^\\mathrm{ff}_\\nu` is the flux density in Janskys, :math:`\\Omega` is the beam solid angle, and all other symbols have their usual meanings
+    where :math:`S^\mathrm{ff}_\nu` is the flux density in Janskys, :math:`\Omega` is the beam solid angle, and all other symbols have their usual meanings
 
     References
     ----------
-    .. [1] Draine, B.T. (2011) https://ui.adsabs.harvard.edu/abs/2011piim.book.....D/abstract
-    .. [2] Carol, B.W., Oslie, D.A., 2007, An Introduction to Modern Astrophysics, 2 edn. Cambridge Univerity Press, Cambridge, UK
+    Draine, B. T. (2011). *Physics of the Interstellar and Intergalactic Medium*. Princeton University Press.
     """
 
     ff_em = Parameter(default=100, min=0, description="Free-free emission measure")
@@ -335,14 +340,16 @@ class freeFree(FittableEmissionModel):
 class ame_lognormal(FittableEmissionModel):
     r"""Emission model for an AME lognormal source.
 
-    The AME flux density (:math:`S^{\\mathrm{AME}}_\\nu`) is defined as
+    The AME flux density (:math:`S^{\mathrm{AME}}_\nu`) is defined as
 
-        .. math::
-            S^{\\mathrm{AME}}_\\nu = A_\\mathrm{AME} \\cdot \\exp\\left\\{ -\\frac{1}{2}\\left( \\frac{\\ln(\\nu/\\nu_\\mathrm{AME})}{W_\\mathrm{AME}} \\right)^2  \\right\\},
+    .. math::
+        S^{\mathrm{AME}}_{\nu} = A_{\mathrm{AME}} \cdot \exp\left\{ -\frac{1}{2}\left( \frac{\ln(\nu / \nu_{\mathrm{AME}})}{W_{\mathrm{AME}}} \right)^2  \right\},
 
-    where :math:`A_\\mathrm{AME}` is the AME amplitude, :math:`\\nu_\\mathrm{AME}` is the AME peak frequency, and :math:`W_\\mathrm{AME}` is the full-width half maximum in log-space.
+    where :math:`A_\mathrm{AME}` is the AME amplitude, :math:`\nu_\mathrm{AME}` is the AME peak frequency, and :math:`W_\mathrm{AME}` is the full-width half maximum in log-space (e.g. Stevenson 2014).
 
-    .. [1] Stevenson (2014): https://ui.adsabs.harvard.edu/abs/2014ApJ...781..113S/abstract
+    References
+    ----------
+    Stevenson, M. A. (2014). *The anomalous microwave emission*. PhD thesis, University of Manchester.
     """
 
     ame_ampl = Parameter(default=0.1, min=0, description="AME peak flux density")
@@ -416,14 +423,17 @@ class ame_lognormal(FittableEmissionModel):
 class thermalDust(FittableEmissionModel):
     r"""Emission model for the Planck modified thermal dust curve - a modified blackbody with opacity varying as frequency to some dust spectral index.
 
-    The thermal dust flux denisty (:math:`S^\\mathrm{td}_\\nu`) is defined as
+    The thermal dust flux density (:math:`S^\mathrm{td}_\nu`) is defined as
 
-        .. math::
-            S^\\mathrm{td}_\\nu = \\frac{2k_B\\Omega\\nu^3}{c^2} \\frac{1}{e^{h\\nu/k_BT_b}-1} \\cdot \\tau_{\\nu_0} \\cdot \\left(\\frac{\\nu}{\\nu_0}\\right)^\\beta,
+    .. math::
+        S^\mathrm{td}_\nu = \frac{2k_B\Omega\nu^3}{c^2} \frac{1}{e^{h\nu/k_BT_b}-1} \cdot \tau_{\nu_0} \cdot \left(\frac{\nu}{\nu_0}\right)^\beta,
 
-    where :math:`\\Omega` is the beam solid angle, :math:`\\tau_{\\nu_0}` is the dust optical depth at frequency :math:`\\nu_0` (set here to 353GHz um), :math:`\\beta` being the dust spectral index and :math:`T_d` the dust temperature.
+    where :math:`\Omega` is the beam solid angle, :math:`\tau_{\nu_0}` is the dust optical depth at frequency :math:`\nu_0` (set here to 353GHz um), :math:`\beta` being the dust spectral index and :math:`T_d` the dust temperature.
 
-    .. [1] Draine and Li (2001): https://ui.adsabs.harvard.edu/abs/2001ApJ...551..807D/abstract
+    References
+    ----------
+    Draine, B. T., & Li, A. (2001). Infrared Emission from Interstellar Dust. I. Stochastic Heating of Small Grains. *Astrophysical Journal*, 551(2), 807-824. https://doi.org/10.1086/320227
+    Draine, B. T. (2011). *Physics of the Interstellar and Intergalactic Medium*. Princeton University Press.
     """
 
     tdust_Td = Parameter(default=20, min=0, description="Thermal dust temperature")
