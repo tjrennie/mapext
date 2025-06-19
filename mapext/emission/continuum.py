@@ -31,7 +31,7 @@ __all__ = [
 
 # Synchrotron emission model
 class synchrotron_1comp(FittableEmissionModel):
-    r"""Emission model for 1-component synchrotron emission without spectral break or curvature (power law)2.
+    r"""Emission model for 1-component synchrotron emission without spectral break or curvature (power law).
 
     Defined as
 
@@ -107,7 +107,7 @@ class freeFree_7500k(FittableEmissionModel):
     .. math::
         \tau^\mathrm{ff}_\nu = 5.468\times 10^{-2} \cdot T_e^{-\frac{3}{2}} \left[ \frac{\nu}{\mathrm{GHz}} \right]^{-2} \left[\frac{EM}{\mathrm{pc\,cm}^-6}\right]  g^\mathrm{ff}_\nu
 
-    where :math:`T_e` is the electron tempertature (assumed to be 7500 K), :math:`\nu` is defined as the frequency of observation, :math:`\mathrm{EM}` is the emission measure, and :math:`g_\nu^\mathrm{ff}` the Gaunt factor. The Gaunt factor is then defined as
+    where :math:`T_e` is the electron temperature (assumed to be 7500 K), :math:`\nu` is defined as the frequency of observation, :math:`\mathrm{EM}` is the emission measure, and :math:`g_\nu^\mathrm{ff}` the Gaunt factor. The Gaunt factor is then defined as
 
     .. math::
         g^\mathrm{ff}_\nu = \ln\left(\exp\left\{5.90 - \frac{\sqrt{3}}{\pi}\ln\left(\left[ \frac{\nu}{\mathrm{GHz}} \right] \left[\frac{T_e}{10^4\,\mathrm{K}}\right] ^\frac{3}{2}\right)\right\} + 2.71828\right),
@@ -225,7 +225,7 @@ class freeFree(FittableEmissionModel):
     .. math::
         \tau^\mathrm{ff}_\nu = 5.468\times 10^{-2} \cdot T_e^{-\frac{3}{2}} \left[ \frac{\nu}{\mathrm{GHz}} \right]^{-2} \left[\frac{EM}{\mathrm{pc\,cm}^-6}\right]  g^\mathrm{ff}_\nu
 
-    where :math:`T_e` is the electron tempertature, :math:`\nu` is defined as the frequency of observation, :math:`\mathrm{EM}` is the emission measure, and :math:`g_\nu^\mathrm{ff}` the Gaunt factor. The Gaunt factor is then defined as
+    where :math:`T_e` is the electron temperature, :math:`\nu` is defined as the frequency of observation, :math:`\mathrm{EM}` is the emission measure, and :math:`g_\nu^\mathrm{ff}` the Gaunt factor. The Gaunt factor is then defined as
 
     .. math::
         g^\mathrm{ff}_\nu = \ln\left(\exp\left\{5.90 - \frac{\sqrt{3}}{\pi}\ln\left(\left[ \frac{\nu}{\mathrm{GHz}} \right] \left[\frac{T_e}{10^4\,\mathrm{K}}\right] ^\frac{3}{2}\right)\right\} + 2.71828\right),
@@ -423,7 +423,7 @@ class ame_lognormal(FittableEmissionModel):
 class thermalDust(FittableEmissionModel):
     r"""Emission model for the Planck modified thermal dust curve - a modified blackbody with opacity varying as frequency to some dust spectral index.
 
-    The thermal dust flux denisty (:math:`S^\mathrm{td}_\nu`) is defined as
+    The thermal dust flux density (:math:`S^\mathrm{td}_\nu`) is defined as
 
     .. math::
         S^\mathrm{td}_\nu = \frac{2k_B\Omega\nu^3}{c^2} \frac{1}{e^{h\nu/k_BT_b}-1} \cdot \tau_{\nu_0} \cdot \left(\frac{\nu}{\nu_0}\right)^\beta,
