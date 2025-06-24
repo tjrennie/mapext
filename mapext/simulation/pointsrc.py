@@ -262,7 +262,7 @@ class pointSource(stokesMapSimulationComponent):
             )
 
         # Place the point source at the specified pixel
-        map_data[int(y), int(x)] += 1
+        map_data[round(y), round(x)] += 1
 
         logger.debug(
             f"Generated WCS point source at pixel coordinates: ({int(x)}, {int(y)})"
