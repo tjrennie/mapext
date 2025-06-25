@@ -1,8 +1,9 @@
 from . import core
 from . import emission
 from . import simulation
+from . import photometry
 
-__all__ = ["core", "emission", "simulation", "__version__"]
+__all__ = ["core", "emission", "simulation", "photometry", "__version__"]
 
 import logging
 

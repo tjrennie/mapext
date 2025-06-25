@@ -41,7 +41,7 @@ class stokesMap:
         """
         logger.debug("Initializing stokesMap with assume_v_0=%s", assume_v_0)
         self.assume_v_0 = assume_v_0
-        self.params_supplied = []
+        self._maps_cached = []
 
         # Initialise set parameters
         self._pol_convention = None
@@ -87,7 +87,7 @@ class stokesMap:
         logger.debug("Loading data via kwargs: %s", list(kwargs.keys()))
         for param in kwargs.keys():
             if (param.upper() in queryable_parameters) and (kwargs[param] is not None):
-                self.params_supplied.append(param.upper())
+                self._maps_cached.append(param.upper())
                 setattr(self, f"_{param.upper()}", kwargs[param])
             else:
                 logger.error("Unrecognized parameter: %s", param)
@@ -185,7 +185,7 @@ class stokesMap:
                         stokes_param.upper(),
                         stokes_dict["data"]["nullval"],
                     )
-                self.params_supplied.append(stokes_param.upper())
+                self._maps_cached.append(stokes_param.upper())
 
             # Load uncertainty array if supplied
             if "uncertainty" in stokes_dict:
@@ -383,7 +383,7 @@ class stokesMap:
         else:
             raise ValueError("Projection object must be of type HEALPix or WCS.")
 
-        for stokes in self.params_supplied:
+        for stokes in self._maps_cached:
             stokes_map = getattr(self, f"_{stokes}_MAP")
             if stokes_map is not None:
                 logger.debug("Reprojecting %s map to new projection", stokes)
@@ -526,11 +526,11 @@ class stokesMap:
         logger.debug("Accessing Stokes map for type: %s", stokes_type)
         func = get_stokes_value_mapping(
             stokes_type,
-            self.params_supplied,
+            self._maps_cached,
             assume_v_0=getattr(self, "assume_v_0", None),
         )
         return func(
-            **{param: getattr(self, f"_{param}_MAP") for param in self.params_supplied}
+            **{param: getattr(self, f"_{param}_MAP") for param in self._maps_cached}
         )
 
     @property

@@ -8,13 +8,13 @@ from mapext.core.map import stokesMap
 def test_stokesmap_init():
     smap = stokesMap()
     assert smap.assume_v_0 is True
-    assert smap.params_supplied == []
+    assert smap._maps_cached == []
 
 
 def test_load_from_kwargs():
     smap = stokesMap(I=np.array([1, 2, 3]), Q=np.array([0.5, 0.2, 0.1]))
-    assert "I" in smap.params_supplied
-    assert "Q" in smap.params_supplied
+    assert "I" in smap._maps_cached
+    assert "Q" in smap._maps_cached
     assert np.array_equal(smap._I, np.array([1, 2, 3]))
     assert np.array_equal(smap._Q, np.array([0.5, 0.2, 0.1]))
 
