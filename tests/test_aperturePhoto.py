@@ -1,13 +1,11 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import pytest
 from astropy.wcs import WCS
 
-from mapext.photometry.aperturephotometry import bullseye
-from mapext.simulation import stokesMapSimulation
-from mapext.simulation.pointsrc import pointSource
-from mapext.simulation.noise import whiteNoise
 from mapext.core.source import astroSrc
+from mapext.photometry.aperturephotometry import apertureAnnulus
+from mapext.simulation import stokesMapSimulation
+from mapext.simulation.noise import coloredNoise, whiteNoise
+from mapext.simulation.pointsrc import pointSource
 
 
 @pytest.fixture
@@ -21,7 +19,10 @@ def point_source_with_background_wcs():
 
     simmap = stokesMapSimulation()
     simmap.add_simulation_component(
-        whiteNoise(I_rms=0.2, Q_rms=0.2, U_rms=0.2)
+        coloredNoise(alpha=-1, I_rms=0.1, Q_rms=0.1, U_rms=0.1)
+    )
+    simmap.add_simulation_component(
+        whiteNoise(I_rms=0.1, Q_rms=0.1, U_rms=0.1)
     )
     simmap.add_simulation_component(
         pointSource(I=1, Q=0.4, U=0.5, fwhm_deg=10/60)
@@ -37,9 +38,7 @@ def test_1(point_source_with_background_wcs):
         frame="galactic"
     )
 
-    print(bullseye(
+    apertureAnnulus(
         point_source_with_background_wcs,
         s
-    ))
-
-    assert False
+    )
