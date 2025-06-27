@@ -8,6 +8,7 @@ package functions.
 import logging
 
 import astropy.constants as astropy_const
+import astropy.convolution as astropy_conv
 import astropy.units as astropy_u
 import healpy as hp
 import numpy as np
@@ -16,7 +17,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy_healpix import HEALPix
 
-from mapext.core.projection import reproject
+from mapext.core.projection import healpix_coordsys_to_frame, reproject
 from mapext.core.stokes import get_stokes_value_mapping, queryable_parameters
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ class stokesMap:
         self._frequency = None
         self._wavelength = None
         self._projection = None
+        self._resolution = None
         self._shape = None
 
         # CASE 1: Keyword arguments provided to specify maps
@@ -133,6 +135,10 @@ class stokesMap:
                 "Wavelength loaded from file: %s m", self.wavelength.to(astropy_u.m)
             )
 
+        # Load beam information if supplied
+        if "beamwidth" in load_data:
+            self._resolution = load_data["beamwidth"]["major_amin"] * astropy_u.arcmin
+
         for stokes_param, stokes_dict in load_data["stokes"].items():
             # Load data array
             if "data" in stokes_dict:
@@ -157,12 +163,14 @@ class stokesMap:
                     )
 
                 elif projection.upper() in ["HPX", "HEALPIX"]:
-                    data, proj = self.load_hpx_map(stokes_dict["data"])
+                    data, proj, shape = self.load_hpx_map(stokes_dict["data"])
                     if self.projection is None:
                         self.projection = proj
                     elif self.projection != proj:
-                        raise ValueError(
-                            f"Projection {self.projection} does not match {proj}"
+                        logger.warning(
+                            "Projection %s does not match %s. Proceeding with new projection.",
+                            self.projection,
+                            proj,
                         )
                     if self.shape is None:
                         self.shape = shape
@@ -172,6 +180,7 @@ class stokesMap:
 
                 else:
                     raise ValueError(f"Projection {projection} not supported")
+
                 if "nullval" in stokes_dict["data"]:
                     d = getattr(
                         self,
@@ -255,10 +264,15 @@ class stokesMap:
         data = fits.open(settings["filename"])[settings.get("HDR", 1)].data
         if "tform" in settings:
             data = data[settings["tform"]]
+        data = np.array(data, dtype=float)
         data = data.flatten()
         # Load projection
         hdr = fits.open(settings["filename"])[settings.get("HDR", 1)].header
-        proj = HEALPix(nside=hdr["NSIDE"], order=hdr["ORDERING"])
+        proj = HEALPix(
+            nside=hdr["NSIDE"],
+            order=hdr["ORDERING"],
+            frame=healpix_coordsys_to_frame[hdr["COORDSYS"]],
+        )
         shape = np.array([HEALPix.npix])
         return data, proj, shape
 
@@ -375,7 +389,7 @@ class stokesMap:
             new_shape = proj.npix
         elif isinstance(proj, WCS):
             new_projection = proj
-            if map_shape.shape[0] != proj.naxis:
+            if np.array(map_shape).shape[0] != proj.naxis:
                 raise ValueError(
                     "Map shape does not match the number of axes in the WCS projection."
                 )
@@ -567,3 +581,51 @@ class stokesMap:
     def PF(self):
         """Polarisation fraction (PF) map."""
         return self._get_stokes_map("PF")
+
+    # ==========================================================================
+    # Map manipulation functions
+    def smooth_to(self, fwhm=None):
+        """Smooth the map to a specified FWHM.
+
+        Parameters
+        ----------
+        fwhm : float or astropy Quantity, optional
+            Full width at half maximum (FWHM) in degrees or arcminutes. If not provided, defaults to 1 arcminute.
+        """
+        if fwhm is None:
+            fwhm = 1 * astropy_u.degree
+        elif isinstance(fwhm, (float, int)):
+            fwhm = fwhm * astropy_u.deg
+            logger.info("Assuming FWHM is given in degrees: %s", fwhm)
+
+        # determine smoothing factor
+        smooth_gaussian_deg = (
+            np.sqrt(fwhm**2 - self._resolution**2).to(astropy_u.deg).value
+        )
+
+        logger.debug("Smoothing maps to FWHM: %s", fwhm)
+        for stokes in self._maps_cached:
+            stokes_map = getattr(self, f"_{stokes}_MAP")
+            if (stokes_map is not None) and isinstance(self.projection, HEALPix):
+                logger.debug("Smoothing %s map", stokes)
+                stokes_map[np.isfinite(stokes_map) == False] = hp.UNSEEN  # noqa: E712
+                smoothed_map = np.array(
+                    hp.smoothing(
+                        stokes_map, fwhm=np.radians(smooth_gaussian_deg), verbose=True
+                    ),
+                    dtype=float,
+                )
+                smoothed_map[smoothed_map == hp.UNSEEN] = np.nan
+                setattr(self, f"_{stokes}_MAP", smoothed_map)
+            elif (stokes_map is not None) and isinstance(self.projection, WCS):
+                logger.debug("Smoothing %s map", stokes)
+                stokes_map[np.isfinite(stokes_map) == False] = np.nan  # noqa: E712
+                kernel = astropy_conv.Gaussian2DKernel(
+                    x_stddev=smooth_gaussian_deg / self.projection.wcs.cdelt[0],
+                    y_stddev=smooth_gaussian_deg / self.projection.wcs.cdelt[1],
+                )
+                smoothed_map = astropy_conv.convolve(
+                    stokes_map, kernel, normalize_kernel=True, boundary="extend"
+                )
+                setattr(self, f"_{stokes}_MAP", smoothed_map)
+        self._resolution = fwhm

@@ -60,10 +60,14 @@ class stokesMapSimulationComponent:
         # Initialize known parameters
         for key in expected_keys:
             if key in kwargs.keys():
-                print(f"Setting simulation parameter '{key}' to user-inputted value{kwargs[key]}")
+                print(
+                    f"Setting simulation parameter '{key}' to user-inputted value{kwargs[key]}"
+                )
                 self._simulation_parameters[key] = kwargs[key]
             else:
-                print(f"Setting simulation parameter '{key}' to default value {self._default_simulation_params[key]}")
+                print(
+                    f"Setting simulation parameter '{key}' to default value {self._default_simulation_params[key]}"
+                )
                 self._simulation_parameters[key] = kwargs.get(
                     key, self._default_simulation_params[key]
                 )
@@ -537,7 +541,7 @@ class stokesMapSimulation(stokesMap):
                     combined_U += np.array(getattr(component, "U"), copy=True)
                     combined_V += np.array(getattr(component, "V"), copy=True)
             combined_P = np.sqrt(combined_Q**2 + combined_U**2 + combined_V**2)
-            combined_map = (combined_P/ combined_I) * 100
+            combined_map = (combined_P / combined_I) * 100
 
         else:
             logger.error(f"Invalid Stokes type requested: {stokes_type}")

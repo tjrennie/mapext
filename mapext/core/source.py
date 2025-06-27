@@ -1,4 +1,4 @@
-"""This module defines the astroSrc class for representing astronomical sources and their associated data."""
+"""Module defining the astroSrc class for representing astronomical sources and their associated data."""
 
 import csv
 import json
@@ -6,15 +6,16 @@ import json
 import numpy as np
 from astropy.coordinates import SkyCoord
 
-__all__ = ['astroSrc']
+__all__ = ["astroSrc"]
+
 
 class astroSrc:
     """Class to hold information pertaining to a specific astronomical source.
-    
+
     This class is currently aimed at point sources, although will be expanded to be more flexible.
     """
 
-    def __init__(self, name='unnamed', coords=None, frame='galactic'):
+    def __init__(self, name="unnamed", coords=None, frame="galactic"):
         """Initialization function.
 
         Parameters
@@ -29,22 +30,27 @@ class astroSrc:
         self.name = name
 
         if coords is None:
-            raise ValueError("Coordinates must be provided as a list or a SkyCoord object.")
+            raise ValueError(
+                "Coordinates must be provided as a list or a SkyCoord object."
+            )
 
         if isinstance(coords, SkyCoord):
             self.coord = coords
             self.frame = coords.frame.name
         else:
-            self.coord = SkyCoord(*coords, frame=frame, unit='degree')
+            self.coord = SkyCoord(*coords, frame=frame, unit="degree")
             self.frame = frame
 
-        self.flux = np.array([], dtype=[
-            ('name', '<U40'),
-            ('freq', 'float'),
-            ('bandwidth', 'float'),
-            ('values', 'float', (7,)),
-            ('errors', 'float', (7,))
-        ])
+        self.flux = np.array(
+            [],
+            dtype=[
+                ("name", "<U40"),
+                ("freq", "float"),
+                ("bandwidth", "float"),
+                ("values", "float", (7,)),
+                ("errors", "float", (7,)),
+            ],
+        )
 
     def add_flux(self, name, freq, bandwidth, values, errors):
         """Add a flux measurement entry.
@@ -62,7 +68,9 @@ class astroSrc:
         errors : array-like of float
             Errors corresponding to the flux values (7 elements expected).
         """
-        new_entry = np.array([(name, freq, bandwidth, values, errors)], dtype=self.flux.dtype)
+        new_entry = np.array(
+            [(name, freq, bandwidth, values, errors)], dtype=self.flux.dtype
+        )
         self.flux = np.append(self.flux, new_entry)
 
     def __repr__(self):
@@ -80,12 +88,12 @@ class astroSrc:
         list of astroSrc
         """
         sources = []
-        with open(filename, newline='') as csvfile:
+        with open(filename, newline="") as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                name = row['name']
-                coords = [float(row['lon']), float(row['lat'])]
-                frame = row.get('frame', 'galactic')
+                name = row["name"]
+                coords = [float(row["lon"]), float(row["lat"])]
+                frame = row.get("frame", "galactic")
 
                 src = cls(name=name, coords=coords, frame=frame)
 
@@ -107,21 +115,21 @@ class astroSrc:
 
         sources = []
         for item in data:
-            name = item['name']
-            coords = item['coords']
-            frame = item.get('frame', 'galactic')
+            name = item["name"]
+            coords = item["coords"]
+            frame = item.get("frame", "galactic")
 
             src = cls(name=name, coords=coords, frame=frame)
 
             # Similar flux parsing if flux info is present
-            if 'flux' in item:
-                for flux_entry in item['flux']:
+            if "flux" in item:
+                for flux_entry in item["flux"]:
                     src.add_flux(
-                        flux_entry['name'],
-                        flux_entry['freq'],
-                        flux_entry['bandwidth'],
-                        flux_entry['values'],
-                        flux_entry['errors']
+                        flux_entry["name"],
+                        flux_entry["freq"],
+                        flux_entry["bandwidth"],
+                        flux_entry["values"],
+                        flux_entry["errors"],
                     )
 
             sources.append(src)
