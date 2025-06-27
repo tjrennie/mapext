@@ -175,8 +175,6 @@ def apPhoto_regionPlot(
     else:
         rows = [components]
 
-    print(rows)
-
     if len(rows) > 1:
         gridshape = (len(rows), 2 * max(*[len(x) for x in rows]))
     else:
