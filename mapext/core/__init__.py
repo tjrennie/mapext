@@ -1,6 +1,6 @@
-from . import map, projection, stokes, utils
+from . import map, source, projection, stokes, utils
 
-__all__ = ["map", "projection", "stokes", "utils"]
+__all__ = ["map", "source", "projection", "stokes", "utils"]
 
 import logging
 

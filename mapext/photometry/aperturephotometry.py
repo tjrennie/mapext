@@ -1,0 +1,256 @@
+"""Module providing functions for performing aperture photometry on astronomical maps, including plotting utilities for visualizing aperture and annulus regions."""
+
+import logging
+
+import astropy.units as astropy_u
+import colorcet as cc
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.wcs.utils import skycoord_to_pixel
+from regions import CircleAnnulusSkyRegion, CircleSkyRegion
+
+from mapext.core.stokes import display_parameters
+
+logger = logging.getLogger(__name__)
+
+
+def apPhoto(astroMap, foreground, background):
+    """Perform aperture photometry on a single AstroMap object using a foreground region and background region."""
+    src_mask = (
+        foreground.to_pixel(astroMap.projection)
+        .to_mask(mode="center")
+        .to_image(astroMap.shape)
+    )
+    bkg_mask = (
+        background.to_pixel(astroMap.projection)
+        .to_mask(mode="center")
+        .to_image(astroMap.shape)
+    )
+
+    Sv_stokes = astroMap._maps_cached
+    Sv = []
+    Sv_e = []
+    if astroMap.assume_v_0:
+        Sv_stokes = [stokes for stokes in Sv_stokes if stokes != "V"]
+
+    for stokes in Sv_stokes:
+        compmap = getattr(astroMap, stokes)
+
+        src_sum = np.nansum(compmap * src_mask)
+        src_cnt = np.nansum(src_mask)
+
+        bkg_sum = np.nansum(compmap * bkg_mask)
+        bkg_std = np.nanstd(compmap[bkg_mask > 0.5])
+        bkg_cnt = np.nansum(bkg_mask)
+
+        Sv.append(src_sum - (bkg_sum / bkg_cnt) * src_cnt)
+        Sv_e.append(
+            bkg_std * np.sqrt(src_cnt * (1 + (np.pi / 2) * (src_cnt / bkg_cnt)))
+        )
+
+    return Sv, Sv_e, Sv_stokes
+
+
+def apertureAnnulus(
+    astroMap,
+    astroSrc,
+    aperture=5 / 60,
+    annulus=[10 / 60, 15 / 60],
+    plot=False,
+    components="core",
+    assume_v_0=True,
+    save_path=None,
+    return_results=False,
+    verbose=True,
+):
+    """Perform aperture photometry and optionally plot the aperture layout.
+
+    Parameters
+    ----------
+    astroMap : AstroMap
+        Map object containing Stokes parameters.
+    astroSrc : AstroSource
+        Source object containing sky coordinates.
+    aperture : float
+        Radius of the circular aperture in degrees.
+    annulus : list of float
+        Inner and outer radius of the background annulus in degrees.
+    plot : bool
+        Whether to generate the bullseye plot.
+    components : str or list
+        Which Stokes components to plot.
+    assume_v_0 : bool
+        Whether to assume Stokes V is zero and omit from analysis.
+    save_path : str or None
+        File path to save the plot. If None, the plot is not saved.
+    return_results : bool
+        If True, return the photometry results.
+    verbose : bool
+        If True, print photometry results.
+
+    Returns
+    -------
+    If return_results is True:
+        tuple: (Sv, Sve, Svs)
+    """
+    region_src = CircleSkyRegion(center=astroSrc.coord, radius=aperture * astropy_u.deg)
+    region_bkg = CircleAnnulusSkyRegion(
+        center=astroSrc.coord,
+        inner_radius=annulus[0] * astropy_u.deg,
+        outer_radius=annulus[1] * astropy_u.deg,
+    )
+
+    Sv, Sve, Svs = apPhoto(astroMap, foreground=region_src, background=region_bkg)
+
+    if verbose:
+        for s, f, e in zip(Svs, Sv, Sve):
+            print(f"{s}: {f:.4g} ± {e:.4g}")
+
+    if plot:
+        fig = apPhoto_regionPlot(
+            astroMap,
+            astroSrc,
+            region_src,
+            region_bkg,
+            components="core",
+            assume_v_0=assume_v_0,
+        )
+        if save_path:
+            fig.savefig(save_path, bbox_inches="tight", dpi=300)
+            if verbose:
+                print(f"Plot saved to: {save_path}")
+        if not save_path:
+            plt.show()
+        plt.close(fig)
+
+    if return_results:
+        return Sv, Sve, Svs, fig if plot else None
+    return None
+
+
+def apPhoto_regionPlot(
+    astroMap,
+    astroSrc,
+    aperture_region,
+    annulus_region,
+    components="all",
+    assume_v_0=True,
+):
+    """Plot the bullseye region for aperture photometry.
+
+    Parameters
+    ----------
+    astroMap : AstroMap
+        Map object containing Stokes parameters.
+    astroSrc : AstroSource
+        Source object containing sky coordinates.
+    aperture_region : CircleSkyRegion
+        Region defining the circular aperture.
+    annulus_region : CircleAnnulusSkyRegion
+        Region defining the annulus for background subtraction.
+    components : str or list
+        Which Stokes components to plot. Options are 'all', 'core', or a list
+        of specific components.
+    assume_v_0 : bool
+        Whether to assume Stokes V is zero and omit it from the analysis.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The figure containing the bullseye plot.
+    """
+    if components == "all":
+        components = list(display_parameters.keys())
+        if assume_v_0:
+            components = [comp for comp in components if comp != "V"]
+            rows = [components[:-3], components[-3:]]
+        else:
+            rows = [components[:1], components[1:-3], components[-3:]]
+    elif components == "core":
+        components = ["I", "Q", "U", "V"]
+        if assume_v_0:
+            components.remove("V")
+        rows = [components]
+    else:
+        rows = [components]
+
+    if len(rows) > 1:
+        gridshape = (len(rows), 2 * max(*[len(x) for x in rows]))
+    else:
+        gridshape = (1, 2 * len(rows[0]))
+
+    fig = plt.figure(figsize=(gridshape[1] * 3 / 2, gridshape[0] * 4))
+    gs = gridspec.GridSpec(
+        gridshape[0], gridshape[1], figure=fig, wspace=0.2, hspace=0.2
+    )
+    axs = []
+
+    for i, row in enumerate(rows):
+        row_len = len(row)
+        for j, comp in enumerate(row):
+            axs.append(
+                fig.add_subplot(
+                    gs[
+                        i,
+                        gridshape[1] // 2
+                        - row_len
+                        + 2 * j : gridshape[1] // 2
+                        - row_len
+                        + 2 * j
+                        + 2,
+                    ],
+                    projection=astroMap.projection,
+                    sharex=axs[0] if i > 0 else None,
+                    sharey=axs[0] if j > 0 else None,
+                )
+            )
+
+            try:
+                m = getattr(astroMap, comp)
+            except ValueError:
+                m = np.full(astroMap.shape, 0)
+
+            if comp == "A":
+                m = np.degrees(m)
+
+            if comp == "A":
+                im_base = axs[-1].imshow(
+                    m,
+                    origin="lower",
+                    vmin=0,
+                    vmax=180,
+                    cmap=cc.cm["cyclic_mygbm_30_95_c78"],
+                )
+            else:
+                im_base = axs[-1].imshow(
+                    m, origin="lower", cmap=cc.cm["linear_bmy_10_95_c78"]
+                )
+
+            x, y = skycoord_to_pixel(astroSrc.coord, astroMap.projection)
+            axs[-1].axhline(y, color="#000000", lw=1, alpha=0.5)
+            axs[-1].axvline(x, color="#000000", lw=1, alpha=0.5)
+
+            aperture_region.to_pixel(astroMap.projection).plot(
+                ax=axs[-1], color="#00ECE1", lw=1, ls="solid", label="Aperture"
+            )
+            annulus_region.to_pixel(astroMap.projection).plot(
+                ax=axs[-1], color="#00E73A", lw=1, ls="solid", label="Annulus"
+            )
+
+            axs[-1].set_title(f"{comp}")
+            axs[-1].set_xlabel(astroMap.projection.wcs.ctype[0])
+            axs[-1].set_ylabel(astroMap.projection.wcs.ctype[1])
+
+            if comp in ["I", "Q", "U", "V", "P"]:
+                units = "Jy/beam"
+            elif comp == "A":
+                units = "Degrees"
+            elif comp == "PF":
+                units = "N/A"
+            else:
+                raise ValueError(f"Unknown component {comp} for units.")
+
+            plt.colorbar(im_base, ax=axs[-1], orientation="horizontal", label=units)
+
+    return fig

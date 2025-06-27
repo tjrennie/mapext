@@ -19,6 +19,36 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
+healpix_coordsys_to_frame = {
+    "G": "galactic",
+    "E": "geocentricmeanecliptic",
+    "C": "icrs",
+}
+frame_to_healpix_coordsys = {
+    "galactic": "G",
+    "geocentricmeanecliptic": "E",
+    "heliocentricmeanecliptic": "E",
+    "barycentricmeanecliptic": "E",
+    "barycentrictrueecliptic": "E",
+    "custombarycentricecliptic": "E",
+    "fk4": "C",
+    "fk5": "C",
+    "icrs": "C",
+    "gcrs": "C",
+    "cirs": "C",
+    "hcrs": "C",
+    "itrs": "C",
+    "hadec": "C",
+    "teme": "C",
+    "tete": "C",
+    "precessedgeocentric": "C",
+    "lsr": "C",
+    "lsrk": "C",
+    "lsrd": "C",
+    "supergalactic": "C",
+}
+
+
 def reproject(data, proj1, proj2, shape_out=None, preserve_flux=False):
     """Reproject data from one projection to another.
 
@@ -57,7 +87,6 @@ def reproject(data, proj1, proj2, shape_out=None, preserve_flux=False):
             (data, proj1),
             proj2,
             shape_out=shape_out,
-            return_footprint=True,
         )
         mapout[mask == 0] = np.nan
 
@@ -68,17 +97,21 @@ def reproject(data, proj1, proj2, shape_out=None, preserve_flux=False):
             nside=proj2.nside,
             projection_type="ring" if proj2.order == "ring" else "nested",
             frame=proj2.frame.name,
-            return_footprint=True,
         )
         mapout[mask == 0] = np.nan
 
     # HEALPix -> WCS
     elif isinstance(proj1, HEALPix) and isinstance(proj2, WCS):
+        try:
+            coordsys = frame_to_healpix_coordsys[proj1.frame.name.lower()]
+        except KeyError:
+            raise ValueError(f"Unrecognized HEALPix frame: {proj1.frame.name}")
+
         mapout, mask = reproject_from_healpix(
-            (data, proj1),
+            (data, coordsys),
             proj2,
+            nested=proj1.order == "nested",
             shape_out=shape_out,
-            return_footprint=True,
         )
         mapout[mask == 0] = np.nan
 

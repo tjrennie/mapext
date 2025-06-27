@@ -40,7 +40,7 @@ class stokesMapSimulationComponent:
 
     def __init__(self, assume_v_0: bool = True, **kwargs):
         """Class to hold simulation components to be used in simulated maps."""
-        self.params_supplied = []
+        self._maps_cached = []
         self.assume_v_0 = assume_v_0
         self._projection = None
         self._shape_out = None
@@ -59,9 +59,18 @@ class stokesMapSimulationComponent:
 
         # Initialize known parameters
         for key in expected_keys:
-            self._simulation_parameters[key] = kwargs.get(
-                key, self._default_simulation_params[key]
-            )
+            if key in kwargs.keys():
+                print(
+                    f"Setting simulation parameter '{key}' to user-inputted value{kwargs[key]}"
+                )
+                self._simulation_parameters[key] = kwargs[key]
+            else:
+                print(
+                    f"Setting simulation parameter '{key}' to default value {self._default_simulation_params[key]}"
+                )
+                self._simulation_parameters[key] = kwargs.get(
+                    key, self._default_simulation_params[key]
+                )
         logger.info(
             f"{self.__class__.__name__} initialized with assume_v_0={assume_v_0}"
         )
@@ -163,7 +172,7 @@ class stokesMapSimulationComponent:
 
     def reset_cached_maps(self):
         """Reset cached maps to None."""
-        self._maps_cached = False
+        self._maps_cached = []
         self._I_MAP = None
         self._Q_MAP = None
         self._U_MAP = None
@@ -259,9 +268,8 @@ class stokesMapSimulationComponent:
         sim_components = self.run_simulation(**self._simulation_parameters)
         for key, value in sim_components.items():
             setattr(self, f"_{key}_MAP", value)
-            self.params_supplied.append(key)
+            self._maps_cached.append(key)
         logger.debug(f"Simulated keys: {list(sim_components.keys())}")
-        self._maps_cached = True
 
     def run_simulation(self) -> dict:
         """Template for method to generate simulated components required.
@@ -295,13 +303,13 @@ class stokesMapSimulationComponent:
         numpy.ndarray
             The Stokes parameter map corresponding to the given key.
         """
-        if not self._maps_cached:
+        if len(self._maps_cached) == 0:
             self.generate_simulation()
         func = get_stokes_value_mapping(
-            stokes_key, self.params_supplied, assume_v_0=self.assume_v_0
+            stokes_key, self._maps_cached, assume_v_0=self.assume_v_0
         )
         return func(
-            **{param: getattr(self, f"_{param}_MAP") for param in self.params_supplied}
+            **{param: getattr(self, f"_{param}_MAP") for param in self._maps_cached}
         )
 
     @property
@@ -418,6 +426,7 @@ class stokesMapSimulation(stokesMap):
             for component in self.simulation_components:
                 component.projection = proj
                 component.shape = shape
+        self._maps_cached = []
 
     @property
     def projection(self):
@@ -522,12 +531,25 @@ class stokesMapSimulation(stokesMap):
         elif stokes_type == "PF":
             for component in self.simulation_components:
                 if combined_map is None:
-                    combined_P = np.array(getattr(component, "P"), copy=True)
+                    combined_I = np.array(getattr(component, "I"), copy=True)
+                    combined_Q = np.array(getattr(component, "Q"), copy=True)
+                    combined_U = np.array(getattr(component, "U"), copy=True)
+                    combined_V = np.array(getattr(component, "V"), copy=True)
                 else:
-                    combined_P += np.array(getattr(component, "P"), copy=True)
-            combined_map = (combined_P / np.sqrt(combined_Q**2 + combined_U**2)) * 100
+                    combined_I += np.array(getattr(component, "I"), copy=True)
+                    combined_Q += np.array(getattr(component, "Q"), copy=True)
+                    combined_U += np.array(getattr(component, "U"), copy=True)
+                    combined_V += np.array(getattr(component, "V"), copy=True)
+            combined_P = np.sqrt(combined_Q**2 + combined_U**2 + combined_V**2)
+            combined_map = (combined_P / combined_I) * 100
 
         else:
             logger.error(f"Invalid Stokes type requested: {stokes_type}")
+
+        # update maps cached
+        maps_avail = []
+        for component in self.simulation_components:
+            maps_avail.append(component._maps_cached)
+        self._maps_cached = list(set().union(*maps_avail))
 
         return combined_map

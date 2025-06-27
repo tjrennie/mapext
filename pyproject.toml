@@ -12,11 +12,13 @@ authors = [{ name = "Thomas J. Rennie" }]
 dependencies = [
   "astropy",
   "astropy-healpix",
+  "colorcet",
   "healpy",
   "matplotlib",
   "numpy",
   "pandas",
   "pyyaml",
+  "regions",
   "reproject",
   "toml"
 ]
