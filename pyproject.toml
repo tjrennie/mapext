@@ -18,6 +18,7 @@ dependencies = [
   "numpy",
   "pandas",
   "pyyaml",
+  "regions",
   "reproject",
   "toml"
 ]
