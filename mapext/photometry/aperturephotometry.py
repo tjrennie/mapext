@@ -37,14 +37,14 @@ def apPhoto(astroMap, foreground, background):
     for stokes in Sv_stokes:
         compmap = getattr(astroMap, stokes)
 
-        src_sum = np.nansum(compmap * src_mask)
-        src_cnt = np.nansum(src_mask)
+        src_sum = np.nansum(compmap[src_mask>0.5])
+        src_cnt = np.nansum(src_mask>0.5)
 
-        bkg_sum = np.nansum(compmap * bkg_mask)
-        bkg_std = np.nanstd(compmap[bkg_mask > 0.5])
-        bkg_cnt = np.nansum(bkg_mask)
+        bkg_med = np.nanmedian(compmap[bkg_mask>0.5])
+        bkg_std = np.nanstd(compmap[bkg_mask>0.5])
+        bkg_cnt = np.nansum(bkg_mask>0.5)
 
-        Sv.append(src_sum - (bkg_sum / bkg_cnt) * src_cnt)
+        Sv.append(src_sum - (bkg_med * src_cnt))
         Sv_e.append(
             bkg_std * np.sqrt(src_cnt * (1 + (np.pi / 2) * (src_cnt / bkg_cnt)))
         )
@@ -63,6 +63,7 @@ def apertureAnnulus(
     save_path=None,
     return_results=False,
     verbose=True,
+    result_to_src=True
 ):
     """Perform aperture photometry and optionally plot the aperture layout.
 
@@ -88,6 +89,8 @@ def apertureAnnulus(
         If True, return the photometry results.
     verbose : bool
         If True, print photometry results.
+    result_to_src : bool
+        If True, store the results in the astroSrc object.
 
     Returns
     -------
@@ -123,6 +126,17 @@ def apertureAnnulus(
         if not save_path:
             plt.show()
         plt.close(fig)
+
+    if result_to_src:
+        values = {s: f for s, f in zip(Svs, Sv)}
+        errors = {s: e for s, e in zip(Svs, Sve)}
+        astroSrc.add_flux(
+            name=astroMap.name if hasattr(astroMap, 'name') else "none",
+            freq=astroMap.frequency.value if hasattr(astroMap, 'frequency') else 0,
+            bandwidth=astroMap.bandwidth.value if hasattr(astroMap, 'bandwidth') else 0,
+            values=values,
+            errors=errors,
+        )
 
     if return_results:
         return Sv, Sve, Svs, fig if plot else None
@@ -209,7 +223,7 @@ def apPhoto_regionPlot(
             try:
                 m = getattr(astroMap, comp)
             except ValueError:
-                m = np.full(astroMap.shape, 0)
+                m = np.full(astroMap.shape, np.nan)
 
             if comp == "A":
                 m = np.degrees(m)
@@ -243,7 +257,7 @@ def apPhoto_regionPlot(
             axs[-1].set_ylabel(astroMap.projection.wcs.ctype[1])
 
             if comp in ["I", "Q", "U", "V", "P"]:
-                units = "Jy/beam"
+                units = astroMap._unit
             elif comp == "A":
                 units = "Degrees"
             elif comp == "PF":

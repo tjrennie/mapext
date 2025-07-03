@@ -19,7 +19,6 @@ __all__ = [
     "pointSource",
 ]
 
-
 class pointSource(stokesMapSimulationComponent):
     """Simulate point sources at specified coordinates in a map.
 

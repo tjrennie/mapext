@@ -63,11 +63,17 @@ class astroSrc:
             Frequency in Hz or relevant units.
         bandwidth : float
             Bandwidth in Hz or relevant units.
-        values : array-like of float
-            Flux values (7 elements expected).
-        errors : array-like of float
-            Errors corresponding to the flux values (7 elements expected).
+        values : array-like of float or dictionary of str: float
+            Flux values either as an array of 7 elements or a dictionary with keys corresponding to Stokes parameters (I, Q, U, V, etc.).
+        errors : array-like of float or dictionary of str: float
+            Errors associated with the flux values, either as an array of 7 elements or a dictionary
         """
+        # if given as dictionary convert to array of floats in I Q U V P A PF order
+        if isinstance(values, dict):
+            values = np.array([values.get(param, np.nan) for param in ["I", "Q", "U", "V", "P", "A", "PF"]])
+        if isinstance(errors, dict):
+            errors = np.array([errors.get(param, np.nan) for param in ["I", "Q", "U", "V", "P", "A", "PF"]])
+
         new_entry = np.array(
             [(name, freq, bandwidth, values, errors)], dtype=self.flux.dtype
         )

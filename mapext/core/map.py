@@ -19,6 +19,7 @@ from astropy_healpix import HEALPix
 
 from mapext.core.projection import healpix_coordsys_to_frame, reproject
 from mapext.core.stokes import get_stokes_value_mapping, queryable_parameters
+from mapext.core.utils import string_to_astropy_unit
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ class stokesMap:
 
         # Initialise set parameters
         self._pol_convention = None
+        self._unit = None
         self._frequency = None
         self._wavelength = None
         self._projection = None
@@ -114,6 +116,13 @@ class stokesMap:
         with open(filename) as f:
             load_data = yaml.safe_load(f)
 
+        # Load name
+        if "name" in load_data:
+            self.name = load_data["name"]
+            if "shortname" in load_data:
+                self.shortname = load_data["shortname"]
+            else:
+                self.shortname = self.name
         # Load frequency information if supplied
         if "frequency" in load_data:
             logger.debug("Found frequency in file.")
@@ -245,6 +254,16 @@ class stokesMap:
         hdr = fits.open(settings["filename"])[settings.get("HDR", 0)].header
         proj = WCS(hdr)
         shape = data.shape
+        # Check units against _unit
+        if settings.get("units", None) is not None:
+            if self._unit is None:
+                self._unit = string_to_astropy_unit(settings["units"])
+                if self._unit in [astropy_u.K, astropy_u.mK, astropy_u.nK]:
+                    self._unit_temp = 'cmb' if settings.get("temp_cmb", False) else 'rj'
+            elif self._unit != string_to_astropy_unit(settings["units"]):
+                raise ValueError(
+                    f"Unit {self._unit} does not match {settings['units']}"
+                )
         return data, proj, shape
 
     def load_hpx_map(self, settings):
@@ -261,19 +280,32 @@ class stokesMap:
             A tuple containing the data array and the HEALPix projection object.
         """
         # Load data
-        data = fits.open(settings["filename"])[settings.get("HDR", 1)].data
-        if "tform" in settings:
-            data = data[settings["tform"]]
+        data = hp.read_map(settings["filename"], field=settings.get("tform", None))
         data = np.array(data, dtype=float)
         data = data.flatten()
         # Load projection
         hdr = fits.open(settings["filename"])[settings.get("HDR", 1)].header
+        try:
+            frame = healpix_coordsys_to_frame[hdr["COORDSYS"]]
+        except KeyError:
+            logger.warning("COORDSYS keyword not found or recognised. Assuming HEALPix frame is galactic")
+            frame = 'galactic'
         proj = HEALPix(
             nside=hdr["NSIDE"],
-            order=hdr["ORDERING"],
-            frame=healpix_coordsys_to_frame[hdr["COORDSYS"]],
+            order="RING",
+            frame=frame,
         )
         shape = np.array([HEALPix.npix])
+        # Check units against _unit
+        if settings.get("units", None) is not None:
+            if self._unit is None:
+                self._unit = string_to_astropy_unit(settings["units"])
+                if self._unit in [astropy_u.K, astropy_u.mK, astropy_u.nK]:
+                    self._unit_temp = 'cmb' if settings.get("temp_cmb", False) else 'rj'
+            elif self._unit != string_to_astropy_unit(settings["units"]):
+                raise ValueError(
+                    f"Unit {self._unit} does not match {settings['units']}"
+                )
         return data, proj, shape
 
     # ==========================================================================
@@ -368,6 +400,32 @@ class stokesMap:
         else:
             raise ValueError("Projection must be either a WCS or HEALPix object.")
 
+    def unit_classification(self):
+        """
+        Classify a unit as 'temperature', 'flux', 'flux density', or 'unknown'.
+
+        Parameters
+        ----------
+        unit : astropy.units.Unit or astropy.units.Quantity
+
+        Returns
+        -------
+        str : classification result
+        """
+        if isinstance(self._unit, astropy_u.Quantity):
+            unit = self._unit.unit
+        else:
+            unit = self._unit
+
+        if unit.is_equivalent(astropy_u.K):
+            return "temperature"
+        elif unit.is_equivalent(astropy_u.Jy):
+            return "flux density"
+        elif unit.is_equivalent(astropy_u.W / astropy_u.m**2) or unit.is_equivalent(astropy_u.erg / (astropy_u.s * astropy_u.cm**2)):
+            return "flux"
+        else:
+            return "unknown"
+
     def set_projection(self, proj, map_shape=None, **kwargs):
         """Set the projection for the map, either as a HEALPix or WCS and transform all maps.
 
@@ -402,7 +460,7 @@ class stokesMap:
             if stokes_map is not None:
                 logger.debug("Reprojecting %s map to new projection", stokes)
                 if isinstance(new_projection, HEALPix):
-                    stokes_map = reproject(stokes_map, self.projection, new_projection)
+                    stokes_map = reproject(stokes_map, self.projection, new_projection, preserve_flux=True if self.unit_classification() == "flux density" else False)
                 elif isinstance(new_projection, WCS):
                     stokes_map = reproject(
                         stokes_map,
@@ -584,7 +642,7 @@ class stokesMap:
 
     # ==========================================================================
     # Map manipulation functions
-    def smooth_to(self, fwhm=None):
+    def smooth_to(self, fwhm=None, preserve='flux'):
         """Smooth the map to a specified FWHM.
 
         Parameters
@@ -608,15 +666,17 @@ class stokesMap:
             stokes_map = getattr(self, f"_{stokes}_MAP")
             if (stokes_map is not None) and isinstance(self.projection, HEALPix):
                 logger.debug("Smoothing %s map", stokes)
-                stokes_map[np.isfinite(stokes_map) == False] = hp.UNSEEN  # noqa: E712
+                mask = np.isfinite(stokes_map) & (stokes_map != hp.UNSEEN) & (stokes_map != 0.0) & (stokes_map > -1e30)
+                stokes_map[~mask] = 0.0
+                stokes_map_clean = np.copy(stokes_map)
+                stokes_map_clean[~mask] = 0.0
                 smoothed_map = np.array(
-                    hp.smoothing(
-                        stokes_map, fwhm=np.radians(smooth_gaussian_deg), verbose=True
-                    ),
+                    hp.smoothing(stokes_map_clean, fwhm=np.radians(smooth_gaussian_deg)),
                     dtype=float,
                 )
-                smoothed_map[smoothed_map == hp.UNSEEN] = np.nan
+                smoothed_map[~mask] = np.nan
                 setattr(self, f"_{stokes}_MAP", smoothed_map)
+
             elif (stokes_map is not None) and isinstance(self.projection, WCS):
                 logger.debug("Smoothing %s map", stokes)
                 stokes_map[np.isfinite(stokes_map) == False] = np.nan  # noqa: E712
@@ -625,7 +685,70 @@ class stokesMap:
                     y_stddev=smooth_gaussian_deg / self.projection.wcs.cdelt[1],
                 )
                 smoothed_map = astropy_conv.convolve(
-                    stokes_map, kernel, normalize_kernel=True, boundary="extend"
+                    stokes_map, kernel, normalize_kernel=True, boundary="fill"
                 )
                 setattr(self, f"_{stokes}_MAP", smoothed_map)
         self._resolution = fwhm
+
+    def set_units(self, new_units):
+        """Convert the map units to a new set of units.
+
+        Parameters
+        ----------
+        new_units : astropy.units.Unit
+            The new units to convert the map to.
+        """
+        if type(new_units) is str:
+            new_units = string_to_astropy_unit(new_units)
+        conv_start = 1 * self._unit
+        if new_units != self._unit:
+            # first convert to Jy.sr
+            if self._unit in [astropy_u.W/(astropy_u.m**2 * astropy_u.sr)]:
+                conv_int = (conv_start).to(astropy_u.Jy/astropy_u.sr, equivalencies=astropy_u.spectral_density(self.frequency))
+            elif (self._unit in [astropy_u.K, astropy_u.mK, astropy_u.uK, astropy_u.nK]) and (self._unit_temp == 'rj'):
+                # print('RJ')
+                conv_int = (conv_start).to(astropy_u.Jy/astropy_u.sr, equivalencies=astropy_u.brightness_temperature(self.frequency))
+            elif (self._unit in [astropy_u.K, astropy_u.mK, astropy_u.uK, astropy_u.nK]) and (self._unit_temp == 'cmb'):
+                # print('CMB')
+                from astropy.cosmology import Planck15
+                conv_int = (conv_start).to(
+                    astropy_u.Jy/astropy_u.sr, equivalencies=astropy_u.thermodynamic_temperature(self.frequency, Planck15.Tcmb0))
+            elif (self._unit in [astropy_u.Jy/astropy_u.sr, string_to_astropy_unit('MJy/sr')]):
+                conv_int = (conv_start).to(astropy_u.Jy/astropy_u.sr)
+            elif self._unit in [astropy_u.Jy/astropy_u.beam, astropy_u.mJy/astropy_u.beam]:
+                conv_int = (conv_start).to(astropy_u.Jy/astropy_u.sr, equivalencies=astropy_u.beam_angular_area(self.get_beam_area()))
+            elif self._unit in [astropy_u.Jy/(astropy_u.pixel**2)]:
+                pixel = self.pixelsize
+                conv_int = ((conv_start) / pixel).to(astropy_u.Jy/astropy_u.sr)
+            else:
+                raise ValueError(f'Unit {self._unit} not recognised as flux density units')
+            # convert to final units
+            # first convert to Jy.sr
+            if new_units in [astropy_u.W/(astropy_u.m**2 * astropy_u.sr)]:
+                conv_final = conv_int.to(new_units, equivalencies=astropy_u.spectral_density(self.frequency))
+            elif new_units in [astropy_u.K]:
+                conv_final = conv_int.to(new_units, equivalencies=astropy_u.brightness_temperature(self.frequency))
+            elif new_units in [astropy_u.Jy/astropy_u.sr]:
+                conv_final = conv_int
+            elif new_units in [astropy_u.Jy/astropy_u.beam]:
+                conv_final = conv_int.to(new_units, equivalencies=astropy_u.beam_angular_area(self.get_beam_area()))
+            elif new_units in [astropy_u.Jy/(astropy_u.pixel**2)]:
+                pixel = self.pixelsize
+                conv_final = (conv_int * pixel).to(astropy_u.Jy/(astropy_u.pixel**2))
+            else:
+                raise ValueError(f'Unit {new_units} not recognised as flux density units')
+            
+            for stokes in self._maps_cached:
+                stokes_map = getattr(self, f"_{stokes}_MAP")
+                stokes_map[np.isfinite(stokes_map) == False] = np.nan # noqa: E712
+                if stokes_map is not None:
+                    setattr(self, f"_{stokes}_MAP", (stokes_map / conv_start * conv_final).value)
+            self._unit = new_units
+        return
+    
+    @property
+    def pixelsize(self):
+        """Get the pixel size of the map in square degrees."""
+        if isinstance(self.projection, WCS):
+            return abs(self.projection.wcs.cdelt[0]*self.projection.wcs.cdelt[1]) * (astropy_u.degree/astropy_u.pixel)**2
+        raise ValueError("Cannot determine pixel size for non-WCS projections.")
