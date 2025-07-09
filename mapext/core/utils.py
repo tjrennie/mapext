@@ -254,7 +254,8 @@ def string_to_astropy_quantity(quantity_string):
         return Quantity(quantity_string)
     if isinstance(quantity_string, Quantity):
         return quantity_string
-    raise ValueError('Cannot convert input to astropy Quantity object.')
+    raise ValueError("Cannot convert input to astropy Quantity object.")
+
 
 def string_to_astropy_unit(unit_string):
     """Convert a string or Unit to an astropy Unit object.
@@ -273,4 +274,4 @@ def string_to_astropy_unit(unit_string):
         return Unit(unit_string)
     if isinstance(unit_string, Unit):
         return unit_string
-    raise ValueError('Cannot convert input to astropy Unit object.')
+    raise ValueError("Cannot convert input to astropy Unit object.")

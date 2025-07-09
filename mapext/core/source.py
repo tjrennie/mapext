@@ -73,9 +73,19 @@ class astroSrc:
             Observation time, stored as decimal year.
         """
         if isinstance(values, dict):
-            values = np.array([values.get(param, np.nan) for param in ["I", "Q", "U", "V", "P", "A", "PF"]])
+            values = np.array(
+                [
+                    values.get(param, np.nan)
+                    for param in ["I", "Q", "U", "V", "P", "A", "PF"]
+                ]
+            )
         if isinstance(errors, dict):
-            errors = np.array([errors.get(param, np.nan) for param in ["I", "Q", "U", "V", "P", "A", "PF"]])
+            errors = np.array(
+                [
+                    errors.get(param, np.nan)
+                    for param in ["I", "Q", "U", "V", "P", "A", "PF"]
+                ]
+            )
 
         if isinstance(epoch, Time):
             epoch_year = epoch.decimalyear
@@ -86,11 +96,12 @@ class astroSrc:
         elif epoch is None:
             epoch_year = np.nan
         else:
-            raise ValueError("Epoch must be a float, string, or astropy.time.Time instance.")
+            raise ValueError(
+                "Epoch must be a float, string, or astropy.time.Time instance."
+            )
 
         new_entry = np.array(
-            [(name, freq, bandwidth, values, errors, epoch_year)],
-            dtype=self.flux.dtype
+            [(name, freq, bandwidth, values, errors, epoch_year)], dtype=self.flux.dtype
         )
         self.flux = np.append(self.flux, new_entry)
 
@@ -123,11 +134,26 @@ class astroSrc:
                     freq = float(row["freq"])
                     bandwidth = float(row["bandwidth"])
                     epoch = float(row["epoch"])
-                    values = {key: float(row[key]) for key in ["I", "Q", "U", "V", "P", "A", "PF"] if key in row}
-                    errors = {f"{key}_err": float(row[f"{key}_err"]) for key in ["I", "Q", "U", "V", "P", "A", "PF"] if f"{key}_err" in row}
+                    values = {
+                        key: float(row[key])
+                        for key in ["I", "Q", "U", "V", "P", "A", "PF"]
+                        if key in row
+                    }
+                    errors = {
+                        f"{key}_err": float(row[f"{key}_err"])
+                        for key in ["I", "Q", "U", "V", "P", "A", "PF"]
+                        if f"{key}_err" in row
+                    }
                     # Strip "_err" keys to match expected input
                     errors = {k.replace("_err", ""): v for k, v in errors.items()}
-                    src.add_flux(name="flux_entry", freq=freq, bandwidth=bandwidth, values=values, errors=errors, epoch=epoch)
+                    src.add_flux(
+                        name="flux_entry",
+                        freq=freq,
+                        bandwidth=bandwidth,
+                        values=values,
+                        errors=errors,
+                        epoch=epoch,
+                    )
 
                 sources.append(src)
         return sources
@@ -161,7 +187,7 @@ class astroSrc:
                         flux_entry["bandwidth"],
                         flux_entry["values"],
                         flux_entry["errors"],
-                        flux_entry.get("epoch", None)
+                        flux_entry.get("epoch", None),
                     )
 
             sources.append(src)
