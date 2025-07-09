@@ -5,6 +5,7 @@ import json
 
 import numpy as np
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 
 __all__ = ["astroSrc"]
 
@@ -49,10 +50,11 @@ class astroSrc:
                 ("bandwidth", "float"),
                 ("values", "float", (7,)),
                 ("errors", "float", (7,)),
+                ("epoch", "float64"),  # Epoch in decimal years
             ],
         )
 
-    def add_flux(self, name, freq, bandwidth, values, errors):
+    def add_flux(self, name, freq, bandwidth, values, errors, epoch=None):
         """Add a flux measurement entry.
 
         Parameters
@@ -64,23 +66,36 @@ class astroSrc:
         bandwidth : float
             Bandwidth in Hz or relevant units.
         values : array-like of float or dictionary of str: float
-            Flux values either as an array of 7 elements or a dictionary with keys corresponding to Stokes parameters (I, Q, U, V, etc.).
+            Flux values either as an array of 7 elements or a dictionary with keys corresponding to Stokes parameters (I, Q, U, V, P, A, PF).
         errors : array-like of float or dictionary of str: float
-            Errors associated with the flux values, either as an array of 7 elements or a dictionary
+            Errors associated with the flux values.
+        epoch : float, str, or astropy.time.Time, optional
+            Observation time, stored as decimal year.
         """
-        # if given as dictionary convert to array of floats in I Q U V P A PF order
         if isinstance(values, dict):
             values = np.array([values.get(param, np.nan) for param in ["I", "Q", "U", "V", "P", "A", "PF"]])
         if isinstance(errors, dict):
             errors = np.array([errors.get(param, np.nan) for param in ["I", "Q", "U", "V", "P", "A", "PF"]])
 
+        if isinstance(epoch, Time):
+            epoch_year = epoch.decimalyear
+        elif isinstance(epoch, str):
+            epoch_year = Time(epoch).decimalyear
+        elif isinstance(epoch, (float, int)):
+            epoch_year = float(epoch)
+        elif epoch is None:
+            epoch_year = np.nan
+        else:
+            raise ValueError("Epoch must be a float, string, or astropy.time.Time instance.")
+
         new_entry = np.array(
-            [(name, freq, bandwidth, values, errors)], dtype=self.flux.dtype
+            [(name, freq, bandwidth, values, errors, epoch_year)],
+            dtype=self.flux.dtype
         )
         self.flux = np.append(self.flux, new_entry)
 
     def __repr__(self):
-        return f"<astroSrc: {self.name}, Coord: {self.coord.to_string('decimal')}, Frame: {self.frame}>"
+        return f"<astroSrc: {self.name}, Coord: {self.coord.to_string('decimal')}, Frame: {self.frame}, Flux entries: {len(self.flux)}>"
 
     @classmethod
     def from_csv(cls, filename):
@@ -103,6 +118,17 @@ class astroSrc:
 
                 src = cls(name=name, coords=coords, frame=frame)
 
+                # Optional: parse flux if provided
+                if "freq" in row and "bandwidth" in row and "epoch" in row:
+                    freq = float(row["freq"])
+                    bandwidth = float(row["bandwidth"])
+                    epoch = float(row["epoch"])
+                    values = {key: float(row[key]) for key in ["I", "Q", "U", "V", "P", "A", "PF"] if key in row}
+                    errors = {f"{key}_err": float(row[f"{key}_err"]) for key in ["I", "Q", "U", "V", "P", "A", "PF"] if f"{key}_err" in row}
+                    # Strip "_err" keys to match expected input
+                    errors = {k.replace("_err", ""): v for k, v in errors.items()}
+                    src.add_flux(name="flux_entry", freq=freq, bandwidth=bandwidth, values=values, errors=errors, epoch=epoch)
+
                 sources.append(src)
         return sources
 
@@ -110,7 +136,7 @@ class astroSrc:
     def from_json(cls, filename):
         """Load sources from a JSON file.
 
-        Expects a list of dicts, each with keys: name, coords (list), frame (optional).
+        Expects a list of dicts, each with keys: name, coords (list), frame (optional), flux (optional).
 
         Returns
         -------
@@ -127,7 +153,6 @@ class astroSrc:
 
             src = cls(name=name, coords=coords, frame=frame)
 
-            # Similar flux parsing if flux info is present
             if "flux" in item:
                 for flux_entry in item["flux"]:
                     src.add_flux(
@@ -136,6 +161,7 @@ class astroSrc:
                         flux_entry["bandwidth"],
                         flux_entry["values"],
                         flux_entry["errors"],
+                        flux_entry.get("epoch", None)
                     )
 
             sources.append(src)

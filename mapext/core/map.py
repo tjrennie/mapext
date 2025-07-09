@@ -44,6 +44,7 @@ class stokesMap:
         logger.debug("Initializing stokesMap with assume_v_0=%s", assume_v_0)
         self.assume_v_0 = assume_v_0
         self._maps_cached = []
+        self._calibration = {}
 
         # Initialise set parameters
         self._pol_convention = None
@@ -147,6 +148,14 @@ class stokesMap:
         # Load beam information if supplied
         if "beamwidth" in load_data:
             self._resolution = load_data["beamwidth"]["major_amin"] * astropy_u.arcmin
+        
+        # Load epoch information if supplied
+        if "epoch" in load_data:
+            setattr(
+                self,
+                f"epoch",
+                load_data["epoch"],
+            )
 
         for stokes_param, stokes_dict in load_data["stokes"].items():
             # Load data array
@@ -231,6 +240,9 @@ class stokesMap:
                         stokes_param.upper(),
                         projection,
                     )
+            # Load calibration information if supplied
+            if "calibration" in stokes_dict:
+                self._calibration[stokes_param.upper()] = stokes_dict["calibration"]
 
     # ==========================================================================
     # map loading functions
@@ -258,7 +270,7 @@ class stokesMap:
         if settings.get("units", None) is not None:
             if self._unit is None:
                 self._unit = string_to_astropy_unit(settings["units"])
-                if self._unit in [astropy_u.K, astropy_u.mK, astropy_u.nK]:
+                if self._unit.is_equivalent(astropy_u.K):
                     self._unit_temp = 'cmb' if settings.get("temp_cmb", False) else 'rj'
             elif self._unit != string_to_astropy_unit(settings["units"]):
                 raise ValueError(
@@ -300,7 +312,7 @@ class stokesMap:
         if settings.get("units", None) is not None:
             if self._unit is None:
                 self._unit = string_to_astropy_unit(settings["units"])
-                if self._unit in [astropy_u.K, astropy_u.mK, astropy_u.nK]:
+                if self._unit.is_equivalent(astropy_u.K):
                     self._unit_temp = 'cmb' if settings.get("temp_cmb", False) else 'rj'
             elif self._unit != string_to_astropy_unit(settings["units"]):
                 raise ValueError(

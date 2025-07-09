@@ -28,6 +28,14 @@ def apPhoto(astroMap, foreground, background):
         .to_image(astroMap.shape)
     )
 
+    print(src_mask, bkg_mask)
+
+    if (src_mask is None) or (bkg_mask is None):
+        logger.warning(
+            "No pixels in the source or background region. Returning empty results."
+        )
+        return [], [], []
+
     Sv_stokes = astroMap._maps_cached
     Sv = []
     Sv_e = []
@@ -37,17 +45,24 @@ def apPhoto(astroMap, foreground, background):
     for stokes in Sv_stokes:
         compmap = getattr(astroMap, stokes)
 
-        src_sum = np.nansum(compmap[src_mask>0.5])
-        src_cnt = np.nansum(src_mask>0.5)
+        src_sum = np.nansum(compmap*src_mask)
+        src_cnt = np.nansum(src_mask*np.isfinite(compmap))
 
         bkg_med = np.nanmedian(compmap[bkg_mask>0.5])
         bkg_std = np.nanstd(compmap[bkg_mask>0.5])
-        bkg_cnt = np.nansum(bkg_mask>0.5)
+        bkg_cnt = np.nansum((bkg_mask>0.5)*np.isfinite(compmap))
 
-        Sv.append(src_sum - (bkg_med * src_cnt))
-        Sv_e.append(
-            bkg_std * np.sqrt(src_cnt * (1 + (np.pi / 2) * (src_cnt / bkg_cnt)))
-        )
+        calibration_frac = 0.01 * astroMap._calibration.get(
+            stokes, {}).get("percentage", 0)
+
+        S_nu = src_sum - (bkg_med * src_cnt)
+        Sv.append(S_nu)
+
+        bkg_err_sq = bkg_std**2 * src_cnt * (1 + (np.pi / 2) * (src_cnt / bkg_cnt))
+        cal_err_sq = (calibration_frac * S_nu)**2
+
+        S_nu_err = np.sqrt(bkg_err_sq + cal_err_sq)
+        Sv_e.append(S_nu_err)
 
     return Sv, Sv_e, Sv_stokes
 
@@ -106,6 +121,12 @@ def apertureAnnulus(
 
     Sv, Sve, Svs = apPhoto(astroMap, foreground=region_src, background=region_bkg)
 
+    if len(Sv) == 0 and len(Sve) == 0 and len(Svs) == 0:
+        logger.warning(
+            "No pixels in the source or background region. Returning empty results."
+        )
+        return [], [], []
+
     if verbose:
         for s, f, e in zip(Svs, Sv, Sve):
             print(f"{s}: {f:.4g} ± {e:.4g}")
@@ -128,14 +149,15 @@ def apertureAnnulus(
         plt.close(fig)
 
     if result_to_src:
-        values = {s: f for s, f in zip(Svs, Sv)}
-        errors = {s: e for s, e in zip(Svs, Sve)}
+        values = dict(zip(Svs, Sv))
+        errors = dict(zip(Svs, Sve))
         astroSrc.add_flux(
             name=astroMap.name if hasattr(astroMap, 'name') else "none",
             freq=astroMap.frequency.value if hasattr(astroMap, 'frequency') else 0,
             bandwidth=astroMap.bandwidth.value if hasattr(astroMap, 'bandwidth') else 0,
             values=values,
             errors=errors,
+            epoch=astroMap.epoch if hasattr(astroMap, 'epoch') else None,
         )
 
     if return_results:
