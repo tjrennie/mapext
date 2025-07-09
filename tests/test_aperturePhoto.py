@@ -1,4 +1,3 @@
-import numpy as np
 import pytest
 from astropy.wcs import WCS
 
@@ -34,8 +33,6 @@ def test_photometry_apertureannulus(point_source_with_background_wcs):
 
     s = astroSrc(name="Test Source", coords=(0, 0), frame="galactic")
 
-    print("=" * 80)
-
     res = apertureAnnulus(
         point_source_with_background_wcs,
         s,
@@ -44,13 +41,10 @@ def test_photometry_apertureannulus(point_source_with_background_wcs):
         plot=False,
     )
 
-    print("=" * 80)
-    for _, __ in zip(res[0], res[2]):
-        a = np.nansum(getattr(point_source_with_background_wcs, __))
-        print(_, a, _ / a)
-        if _ == "I":
-            assert _ - 10 < 0.1
-        elif _ == "Q":
-            assert _ - 4 < 0.1
-        elif _ == "U":
-            assert _ - 2 < 0.1
+    for stoke, value in zip(res[2], res[0]):
+        if stoke == "I":
+            assert value - 10 < 0.1
+        elif stoke == "Q":
+            assert value - 4 < 0.1
+        elif stoke == "U":
+            assert value - 2 < 0.1
