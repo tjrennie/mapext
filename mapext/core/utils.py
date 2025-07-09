@@ -9,6 +9,7 @@ import pandas as pd
 import toml
 import yaml
 from astropy.io import fits
+from astropy.units import Quantity, Unit
 
 logger = logging.getLogger(__name__)
 
@@ -234,3 +235,43 @@ def autoload_arraylike(file: str):
     data = loader(file)
     logger.debug(f"File loaded successfully with loader for {path.suffix}")
     return data
+
+
+def string_to_astropy_quantity(quantity_string):
+    """Convert a string or Quantity to an astropy Quantity object.
+
+    Parameters
+    ----------
+    quantity_string : str or Quantity
+        The input quantity to convert.
+
+    Returns
+    -------
+    Quantity
+        The converted astropy Quantity object.
+    """
+    if isinstance(quantity_string, str):
+        return Quantity(quantity_string)
+    if isinstance(quantity_string, Quantity):
+        return quantity_string
+    raise ValueError("Cannot convert input to astropy Quantity object.")
+
+
+def string_to_astropy_unit(unit_string):
+    """Convert a string or Unit to an astropy Unit object.
+
+    Parameters
+    ----------
+    unit_string : str or Unit
+        The input unit to convert.
+
+    Returns
+    -------
+    Unit
+        The converted astropy Unit object.
+    """
+    if isinstance(unit_string, str):
+        return Unit(unit_string)
+    if isinstance(unit_string, Unit):
+        return unit_string
+    raise ValueError("Cannot convert input to astropy Unit object.")

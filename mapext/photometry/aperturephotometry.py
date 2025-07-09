@@ -15,46 +15,70 @@ from mapext.core.stokes import display_parameters
 logger = logging.getLogger(__name__)
 
 
-def apPhoto(astroMap, foreground, background):
-    """Perform aperture photometry on a single AstroMap object using a foreground region and background region."""
+def apPhoto(astro_map, foreground, background):
+    """Perform aperture photometry on a single AstroMap object using a foreground region and background region.
+
+    Parameters
+    ----------
+    astro_map : AstroMap
+        The AstroMap object containing Stokes parameters.
+    foreground : CircleSkyRegion
+        The region defining the source aperture.
+    background : CircleAnnulusSkyRegion
+        The region defining the background annulus.
+    """
     src_mask = (
-        foreground.to_pixel(astroMap.projection)
+        foreground.to_pixel(astro_map.projection)
         .to_mask(mode="center")
-        .to_image(astroMap.shape)
+        .to_image(astro_map.shape)
     )
     bkg_mask = (
-        background.to_pixel(astroMap.projection)
+        background.to_pixel(astro_map.projection)
         .to_mask(mode="center")
-        .to_image(astroMap.shape)
+        .to_image(astro_map.shape)
     )
 
-    Sv_stokes = astroMap._maps_cached
+    if (src_mask is None) or (bkg_mask is None):
+        logger.warning(
+            "No pixels in the source or background region. Returning empty results."
+        )
+        return [], [], []
+
+    Sv_stokes = astro_map._maps_cached
     Sv = []
     Sv_e = []
-    if astroMap.assume_v_0:
+    if astro_map.assume_v_0:
         Sv_stokes = [stokes for stokes in Sv_stokes if stokes != "V"]
 
     for stokes in Sv_stokes:
-        compmap = getattr(astroMap, stokes)
+        compmap = getattr(astro_map, stokes)
 
         src_sum = np.nansum(compmap * src_mask)
-        src_cnt = np.nansum(src_mask)
+        src_cnt = np.nansum(src_mask * np.isfinite(compmap))
 
-        bkg_sum = np.nansum(compmap * bkg_mask)
+        bkg_med = np.nanmedian(compmap[bkg_mask > 0.5])
         bkg_std = np.nanstd(compmap[bkg_mask > 0.5])
-        bkg_cnt = np.nansum(bkg_mask)
+        bkg_cnt = np.nansum((bkg_mask > 0.5) * np.isfinite(compmap))
 
-        Sv.append(src_sum - (bkg_sum / bkg_cnt) * src_cnt)
-        Sv_e.append(
-            bkg_std * np.sqrt(src_cnt * (1 + (np.pi / 2) * (src_cnt / bkg_cnt)))
+        calibration_frac = 0.01 * astro_map._calibration.get(stokes, {}).get(
+            "percentage", 0
         )
+
+        S_nu = src_sum - (bkg_med * src_cnt)
+        Sv.append(S_nu)
+
+        bkg_err_sq = bkg_std**2 * src_cnt * (1 + (np.pi / 2) * (src_cnt / bkg_cnt))
+        cal_err_sq = (calibration_frac * S_nu) ** 2
+
+        S_nu_err = np.sqrt(bkg_err_sq + cal_err_sq)
+        Sv_e.append(S_nu_err)
 
     return Sv, Sv_e, Sv_stokes
 
 
 def apertureAnnulus(
-    astroMap,
-    astroSrc,
+    astro_map,
+    astro_source,
     aperture=5 / 60,
     annulus=[10 / 60, 15 / 60],
     plot=False,
@@ -63,14 +87,15 @@ def apertureAnnulus(
     save_path=None,
     return_results=False,
     verbose=True,
+    result_to_src=True,
 ):
     """Perform aperture photometry and optionally plot the aperture layout.
 
     Parameters
     ----------
-    astroMap : AstroMap
+    astro_map : AstroMap
         Map object containing Stokes parameters.
-    astroSrc : AstroSource
+    astro_source : AstroSource
         Source object containing sky coordinates.
     aperture : float
         Radius of the circular aperture in degrees.
@@ -88,20 +113,30 @@ def apertureAnnulus(
         If True, return the photometry results.
     verbose : bool
         If True, print photometry results.
+    result_to_src : bool
+        If True, store the results in the astro_source object.
 
     Returns
     -------
     If return_results is True:
         tuple: (Sv, Sve, Svs)
     """
-    region_src = CircleSkyRegion(center=astroSrc.coord, radius=aperture * astropy_u.deg)
+    region_src = CircleSkyRegion(
+        center=astro_source.coord, radius=aperture * astropy_u.deg
+    )
     region_bkg = CircleAnnulusSkyRegion(
-        center=astroSrc.coord,
+        center=astro_source.coord,
         inner_radius=annulus[0] * astropy_u.deg,
         outer_radius=annulus[1] * astropy_u.deg,
     )
 
-    Sv, Sve, Svs = apPhoto(astroMap, foreground=region_src, background=region_bkg)
+    Sv, Sve, Svs = apPhoto(astro_map, foreground=region_src, background=region_bkg)
+
+    if len(Sv) == 0 and len(Sve) == 0 and len(Svs) == 0:
+        logger.warning(
+            "No pixels in the source or background region. Returning empty results."
+        )
+        return [], [], []
 
     if verbose:
         for s, f, e in zip(Svs, Sv, Sve):
@@ -109,8 +144,8 @@ def apertureAnnulus(
 
     if plot:
         fig = apPhoto_regionPlot(
-            astroMap,
-            astroSrc,
+            astro_map,
+            astro_source,
             region_src,
             region_bkg,
             components="core",
@@ -124,14 +159,28 @@ def apertureAnnulus(
             plt.show()
         plt.close(fig)
 
+    if result_to_src:
+        values = dict(zip(Svs, Sv))
+        errors = dict(zip(Svs, Sve))
+        astro_source.add_flux(
+            name=astro_map.name if hasattr(astro_map, "name") else "none",
+            freq=astro_map.frequency.value if hasattr(astro_map, "frequency") else 0,
+            bandwidth=(
+                astro_map.bandwidth.value if hasattr(astro_map, "bandwidth") else 0
+            ),
+            values=values,
+            errors=errors,
+            epoch=astro_map.epoch if hasattr(astro_map, "epoch") else None,
+        )
+
     if return_results:
         return Sv, Sve, Svs, fig if plot else None
     return None
 
 
 def apPhoto_regionPlot(
-    astroMap,
-    astroSrc,
+    astro_map,
+    astro_source,
     aperture_region,
     annulus_region,
     components="all",
@@ -141,9 +190,9 @@ def apPhoto_regionPlot(
 
     Parameters
     ----------
-    astroMap : AstroMap
+    astro_map : AstroMap
         Map object containing Stokes parameters.
-    astroSrc : AstroSource
+    astro_source : AstroSource
         Source object containing sky coordinates.
     aperture_region : CircleSkyRegion
         Region defining the circular aperture.
@@ -200,16 +249,16 @@ def apPhoto_regionPlot(
                         + 2 * j
                         + 2,
                     ],
-                    projection=astroMap.projection,
+                    projection=astro_map.projection,
                     sharex=axs[0] if i > 0 else None,
                     sharey=axs[0] if j > 0 else None,
                 )
             )
 
             try:
-                m = getattr(astroMap, comp)
-            except ValueError:
-                m = np.full(astroMap.shape, 0)
+                m = getattr(astro_map, comp)
+            except AttributeError:
+                m = np.full(astro_map.shape, np.nan)
 
             if comp == "A":
                 m = np.degrees(m)
@@ -227,23 +276,23 @@ def apPhoto_regionPlot(
                     m, origin="lower", cmap=cc.cm["linear_bmy_10_95_c78"]
                 )
 
-            x, y = skycoord_to_pixel(astroSrc.coord, astroMap.projection)
+            x, y = skycoord_to_pixel(astro_source.coord, astro_map.projection)
             axs[-1].axhline(y, color="#000000", lw=1, alpha=0.5)
             axs[-1].axvline(x, color="#000000", lw=1, alpha=0.5)
 
-            aperture_region.to_pixel(astroMap.projection).plot(
+            aperture_region.to_pixel(astro_map.projection).plot(
                 ax=axs[-1], color="#00ECE1", lw=1, ls="solid", label="Aperture"
             )
-            annulus_region.to_pixel(astroMap.projection).plot(
+            annulus_region.to_pixel(astro_map.projection).plot(
                 ax=axs[-1], color="#00E73A", lw=1, ls="solid", label="Annulus"
             )
 
             axs[-1].set_title(f"{comp}")
-            axs[-1].set_xlabel(astroMap.projection.wcs.ctype[0])
-            axs[-1].set_ylabel(astroMap.projection.wcs.ctype[1])
+            axs[-1].set_xlabel(astro_map.projection.wcs.ctype[0])
+            axs[-1].set_ylabel(astro_map.projection.wcs.ctype[1])
 
             if comp in ["I", "Q", "U", "V", "P"]:
-                units = "Jy/beam"
+                units = astro_map._unit
             elif comp == "A":
                 units = "Degrees"
             elif comp == "PF":
