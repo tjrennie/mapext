@@ -3,8 +3,8 @@
 import csv
 import json
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
@@ -56,91 +56,6 @@ class astroSrc:
                 ("epoch", "float64"),  # Epoch in decimal years
             ],
         )
-    
-    @classmethod
-    def from_csv(cls, filename):
-        """Load sources from a CSV file.
-
-        The CSV should contain at least columns: name, lon, lat, frame (optional).
-        Additional columns for flux can be added depending on your structure.
-
-        Returns
-        -------
-        list of astroSrc
-        """
-        sources = []
-        with open(filename, newline="") as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                name = row["name"]
-                coords = [float(row["lon"]), float(row["lat"])]
-                frame = row.get("frame", "galactic")
-
-                src = cls(name=name, coords=coords, frame=frame)
-
-                # Optional: parse flux if provided
-                if "freq" in row and "bandwidth" in row and "epoch" in row:
-                    freq = float(row["freq"])
-                    bandwidth = float(row["bandwidth"])
-                    epoch = float(row["epoch"])
-                    values = {
-                        key: float(row[key])
-                        for key in ["I", "Q", "U", "V", "P", "A", "PF"]
-                        if key in row
-                    }
-                    errors = {
-                        f"{key}_err": float(row[f"{key}_err"])
-                        for key in ["I", "Q", "U", "V", "P", "A", "PF"]
-                        if f"{key}_err" in row
-                    }
-                    # Strip "_err" keys to match expected input
-                    errors = {k.replace("_err", ""): v for k, v in errors.items()}
-                    src.add_flux(
-                        name="flux_entry",
-                        freq=freq,
-                        bandwidth=bandwidth,
-                        values=values,
-                        errors=errors,
-                        epoch=epoch,
-                    )
-
-                sources.append(src)
-        return sources
-
-    @classmethod
-    def from_json(cls, filename):
-        """Load sources from a JSON file.
-
-        Expects a list of dicts, each with keys: name, coords (list), frame (optional), flux (optional).
-
-        Returns
-        -------
-        list of astroSrc
-        """
-        with open(filename) as f:
-            data = json.load(f)
-
-        sources = []
-        for item in data:
-            name = item["name"]
-            coords = item["coords"]
-            frame = item.get("frame", "galactic")
-
-            src = cls(name=name, coords=coords, frame=frame)
-
-            if "flux" in item:
-                for flux_entry in item["flux"]:
-                    src.add_flux(
-                        flux_entry["name"],
-                        flux_entry["freq"],
-                        flux_entry["bandwidth"],
-                        flux_entry["values"],
-                        flux_entry["errors"],
-                        flux_entry.get("epoch", None),
-                    )
-
-            sources.append(src)
-        return sources
 
     def __repr__(self):
         return f"<astroSrc: {self.name}, Coord: {self.coord.to_string('decimal')}, Frame: {self.frame}, Flux entries: {len(self.flux)}>"
