@@ -1,13 +1,11 @@
-
-API Reference
-=============
-
+mapext package
+==============
 
 Subpackages
 -----------
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 4
 
    mapext.core
    mapext.emission
@@ -19,5 +17,5 @@ Module contents
 
 .. automodule:: mapext
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
