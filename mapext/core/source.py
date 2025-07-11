@@ -4,8 +4,11 @@ import csv
 import json
 
 import numpy as np
+import matplotlib.pyplot as plt
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
+
+from mapext.core.stokes import queryable_parameters
 
 __all__ = ["astroSrc"]
 
@@ -195,3 +198,39 @@ class astroSrc:
             [(name, freq, bandwidth, values, errors, epoch_year)], dtype=self.flux.dtype
         )
         self.flux = np.append(self.flux, new_entry)
+
+    def plot_stokesflux(self, stokes, ax=None, c='black', marker='x', label_axes=True):
+        """Plot the Stokes parameters of the flux measurements.
+
+        Parameters
+        ----------
+        stokes : str
+            The Stokes parameter to plot (e.g., 'I', 'Q', 'U', 'V').
+        ax : matplotlib.axes.Axes, optional
+            Axes to plot on. If None, uses the current axes.
+        c : str, optional
+            Color of the markers (default 'black').
+        marker : str, optional
+            Marker style for the plot (default 'x').
+        label_axes : bool, optional
+            Whether to label the axes (default True).
+        """
+        if stokes not in queryable_parameters:
+            raise ValueError(f"Invalid Stokes parameter: {stokes}. Must be one of {queryable_parameters}.")
+        stokes_index = queryable_parameters.index(stokes)
+
+        if (ax is None):
+            ax = plt.gca()
+
+        ax.errorbar(
+            self.flux["freq"],
+            self.flux["values"][:,stokes_index],
+            xerr=self.flux["bandwidth"] / 2,
+            yerr=self.flux["errors"][:,stokes_index],
+            ls='none',
+            marker=marker, c=c,
+        )
+
+        if label_axes:
+            ax.set_xlabel(r"$\nu$ (Hz)")
+            ax.set_ylabel(r"$S_\nu$ (Jy)")
