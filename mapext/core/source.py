@@ -53,61 +53,7 @@ class astroSrc:
                 ("epoch", "float64"),  # Epoch in decimal years
             ],
         )
-
-    def add_flux(self, name, freq, bandwidth, values, errors, epoch=None):
-        """Add a flux measurement entry.
-
-        Parameters
-        ----------
-        name : str
-            Name or label for this flux measurement.
-        freq : float
-            Frequency in Hz or relevant units.
-        bandwidth : float
-            Bandwidth in Hz or relevant units.
-        values : array-like of float or dictionary of str: float
-            Flux values either as an array of 7 elements or a dictionary with keys corresponding to Stokes parameters (I, Q, U, V, P, A, PF).
-        errors : array-like of float or dictionary of str: float
-            Errors associated with the flux values.
-        epoch : float, str, or astropy.time.Time, optional
-            Observation time, stored as decimal year.
-        """
-        if isinstance(values, dict):
-            values = np.array(
-                [
-                    values.get(param, np.nan)
-                    for param in ["I", "Q", "U", "V", "P", "A", "PF"]
-                ]
-            )
-        if isinstance(errors, dict):
-            errors = np.array(
-                [
-                    errors.get(param, np.nan)
-                    for param in ["I", "Q", "U", "V", "P", "A", "PF"]
-                ]
-            )
-
-        if isinstance(epoch, Time):
-            epoch_year = epoch.decimalyear
-        elif isinstance(epoch, str):
-            epoch_year = Time(epoch).decimalyear
-        elif isinstance(epoch, (float, int)):
-            epoch_year = float(epoch)
-        elif epoch is None:
-            epoch_year = np.nan
-        else:
-            raise ValueError(
-                "Epoch must be a float, string, or astropy.time.Time instance."
-            )
-
-        new_entry = np.array(
-            [(name, freq, bandwidth, values, errors, epoch_year)], dtype=self.flux.dtype
-        )
-        self.flux = np.append(self.flux, new_entry)
-
-    def __repr__(self):
-        return f"<astroSrc: {self.name}, Coord: {self.coord.to_string('decimal')}, Frame: {self.frame}, Flux entries: {len(self.flux)}>"
-
+    
     @classmethod
     def from_csv(cls, filename):
         """Load sources from a CSV file.
@@ -192,3 +138,60 @@ class astroSrc:
 
             sources.append(src)
         return sources
+
+    def __repr__(self):
+        return f"<astroSrc: {self.name}, Coord: {self.coord.to_string('decimal')}, Frame: {self.frame}, Flux entries: {len(self.flux)}>"
+
+    # ==========================================================================
+    # Flux Measurement Management
+
+    def add_flux(self, name, freq, bandwidth, values, errors, epoch=None):
+        """Add a flux measurement entry.
+
+        Parameters
+        ----------
+        name : str
+            Name or label for this flux measurement.
+        freq : float
+            Frequency in Hz or relevant units.
+        bandwidth : float
+            Bandwidth in Hz or relevant units.
+        values : array-like of float or dictionary of str: float
+            Flux values either as an array of 7 elements or a dictionary with keys corresponding to Stokes parameters (I, Q, U, V, P, A, PF).
+        errors : array-like of float or dictionary of str: float
+            Errors associated with the flux values.
+        epoch : float, str, or astropy.time.Time, optional
+            Observation time, stored as decimal year.
+        """
+        if isinstance(values, dict):
+            values = np.array(
+                [
+                    values.get(param, np.nan)
+                    for param in ["I", "Q", "U", "V", "P", "A", "PF"]
+                ]
+            )
+        if isinstance(errors, dict):
+            errors = np.array(
+                [
+                    errors.get(param, np.nan)
+                    for param in ["I", "Q", "U", "V", "P", "A", "PF"]
+                ]
+            )
+
+        if isinstance(epoch, Time):
+            epoch_year = epoch.decimalyear
+        elif isinstance(epoch, str):
+            epoch_year = Time(epoch).decimalyear
+        elif isinstance(epoch, (float, int)):
+            epoch_year = float(epoch)
+        elif epoch is None:
+            epoch_year = np.nan
+        else:
+            raise ValueError(
+                "Epoch must be a float, string, or astropy.time.Time instance."
+            )
+
+        new_entry = np.array(
+            [(name, freq, bandwidth, values, errors, epoch_year)], dtype=self.flux.dtype
+        )
+        self.flux = np.append(self.flux, new_entry)
