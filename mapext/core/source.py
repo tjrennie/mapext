@@ -48,11 +48,11 @@ class astroSrc:
         self.flux = np.array(
             [],
             dtype=[
-                ("name", "<U40"),
-                ("freq", "float"),
-                ("bandwidth", "float"),
-                ("values", "float", (7,)),
-                ("errors", "float", (7,)),
+                ("name", "<U40"), # Name or label for the flux measurement
+                ("freq", "float"), # Frequency in Hz
+                ("bandwidth", "float"), # Bandwidth in Hz
+                ("values", "float", (7,)),  # Stokes parameters I, Q, U, V, P, A, PF in Jy, Jy, Jy, Jy, Jy, degrees, percent
+                ("errors", "float", (7,)),  # Errors in units as applicable
                 ("epoch", "float64"),  # Epoch in decimal years
             ],
         )
@@ -147,5 +147,15 @@ class astroSrc:
         )
 
         if label_axes:
-            ax.set_xlabel(r"$\nu$ (Hz)")
-            ax.set_ylabel(r"$S_\nu$ (Jy)")
+            ax.set_xlabel(r"$\nu$ [Hz]")
+            stokes_upper = stokes.upper()
+            if stokes_upper in ['I', 'Q', 'U', 'V']:
+                ax.set_ylabel(rf"$S^{{\left({stokes_upper}\right)}}_\nu$ [Jy]")
+            elif stokes_upper == 'P':
+                ax.set_ylabel(r"$P_\nu$ [%]")  # polarized intensity
+            elif stokes_upper == 'A':
+                ax.set_ylabel(r"$\phi_\nu$ [deg]")  # polarization angle
+            elif stokes_upper == 'PF':
+                ax.set_ylabel(r"$\frac{P_\nu}{S^{\left(I\right)}_\nu}$ [%]")  # polarization fraction
+            else:
+                raise ValueError(f"Unknown Stokes parameter: {stokes_upper}")
