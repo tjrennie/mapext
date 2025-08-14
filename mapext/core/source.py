@@ -1,7 +1,6 @@
 """Module defining the astroSrc class for representing astronomical sources and their associated data."""
 
-import csv
-import json
+import logging
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,6 +8,8 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
 from mapext.core.stokes import queryable_parameters
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["astroSrc"]
 
@@ -114,7 +115,7 @@ class astroSrc:
         )
         self.flux = np.append(self.flux, new_entry)
 
-    def plot_stokesflux(self, stokes, ax=None, c='black', marker='x', label_axes=True):
+    def plot_stokesflux(self, stokes, ax=None, c='black', marker='x', label_axes=True, epoch=None):
         """Plot the Stokes parameters of the flux measurements.
 
         Parameters
@@ -129,6 +130,8 @@ class astroSrc:
             Marker style for the plot (default 'x').
         label_axes : bool, optional
             Whether to label the axes (default True).
+        epoch : float or str, optional
+            Observation time as decimal year.
         """
         if stokes not in queryable_parameters:
             raise ValueError(f"Invalid Stokes parameter: {stokes}. Must be one of {queryable_parameters}.")
@@ -137,11 +140,22 @@ class astroSrc:
         if (ax is None):
             ax = plt.gca()
 
+        secvar_correction = 1.0
+        if epoch:
+            if hasattr(self, 'model_secvar'):
+                secvar_correction = self.model_secvar(
+                    **{name: self.flux[name] for name in self.flux.dtype.names}
+                )
+            else:
+                logger.warning(
+                    "No secvar model available, skipping secvar correction."
+                )
+
         ax.errorbar(
             self.flux["freq"],
-            self.flux["values"][:,stokes_index],
+            self.flux["values"][:,stokes_index] * secvar_correction,
             xerr=self.flux["bandwidth"] / 2,
-            yerr=self.flux["errors"][:,stokes_index],
+            yerr=self.flux["errors"][:,stokes_index] * secvar_correction,
             ls='none',
             marker=marker, c=c,
         )
@@ -149,13 +163,16 @@ class astroSrc:
         if label_axes:
             ax.set_xlabel(r"$\nu$ [Hz]")
             stokes_upper = stokes.upper()
+
+            subscript = rf"\nu, {epoch}" if epoch is not None else r"\nu"
+
             if stokes_upper in ['I', 'Q', 'U', 'V']:
-                ax.set_ylabel(rf"$S^{{\left({stokes_upper}\right)}}_\nu$ [Jy]")
+                ax.set_ylabel(rf"$S^{{({stokes_upper})}}_{{{subscript}}}$ [Jy]")
             elif stokes_upper == 'P':
-                ax.set_ylabel(r"$P_\nu$ [%]")  # polarized intensity
+                ax.set_ylabel(rf"$P_{{{subscript}}}$ [%]")  # polarized intensity
             elif stokes_upper == 'A':
-                ax.set_ylabel(r"$\phi_\nu$ [deg]")  # polarization angle
+                ax.set_ylabel(rf"$\phi_{{{subscript}}}$ [deg]")  # polarization angle
             elif stokes_upper == 'PF':
-                ax.set_ylabel(r"$\frac{P_\nu}{S^{\left(I\right)}_\nu}$ [%]")  # polarization fraction
+                ax.set_ylabel(rf"$\frac{{P_{{{subscript}}}}}{{S^{{(I)}}_{{{subscript}}}}}$ [%]")  # polarization fraction
             else:
                 raise ValueError(f"Unknown Stokes parameter: {stokes_upper}")
