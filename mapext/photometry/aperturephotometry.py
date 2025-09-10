@@ -257,7 +257,7 @@ def apPhoto_regionPlot(
 
             try:
                 m = getattr(astro_map, comp)
-            except AttributeError:
+            except (AttributeError, ValueError):
                 m = np.full(astro_map.shape, np.nan)
 
             if comp == "A":
