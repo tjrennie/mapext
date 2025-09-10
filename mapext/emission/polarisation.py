@@ -89,7 +89,7 @@ class constantPol(FittablePolarisationModel):
         list
             First derivitives with repect to input parameters in order.
         """
-        nu, beam, stokes = np.broadcast_arrays(nu, area, stokes)
+        nu, _beam, stokes = np.broadcast_arrays(nu, area, stokes)
         d_pol_PF, d_pol_Angle = np.full(nu.shape, np.nan), np.full(nu.shape, np.nan)
 
         # I
