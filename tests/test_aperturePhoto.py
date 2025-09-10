@@ -41,8 +41,8 @@ def test_photometry_apertureannulus(point_source_with_background_wcs):
 
     for stoke, value, err in zip(res[2], res[0], res[1]):
         if stoke == "I":
-            assert value - 10 < err
+            assert value == pytest.approx(10, err)
         elif stoke == "Q":
-            assert value - 4 < err
+            assert value == pytest.approx(4, err)
         elif stoke == "U":
-            assert value - 2 < err
+            assert value == pytest.approx(2, err)

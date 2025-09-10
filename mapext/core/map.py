@@ -716,14 +716,24 @@ class stokesMap:
                 weight = valid.astype(float)
                 filled_map = np.nan_to_num(stokes_map, nan=0.0)
                 kernel = astropy_conv.Gaussian2DKernel(
-                    x_stddev=smooth_gaussian_deg / (self.projection.wcs.cdelt[0] * 2.355),
-                    y_stddev=smooth_gaussian_deg / (self.projection.wcs.cdelt[1] * 2.355),
+                    x_stddev=smooth_gaussian_deg
+                    / (self.projection.wcs.cdelt[0] * 2.355),
+                    y_stddev=smooth_gaussian_deg
+                    / (self.projection.wcs.cdelt[1] * 2.355),
                 )
                 convolved_map = astropy_conv.convolve(
-                    filled_map, kernel, normalize_kernel=False, boundary="fill", fill_value=0.0
+                    filled_map,
+                    kernel,
+                    normalize_kernel=False,
+                    boundary="fill",
+                    fill_value=0.0,
                 )
                 convolved_weight = astropy_conv.convolve(
-                    weight, kernel, normalize_kernel=False, boundary="fill", fill_value=0.0
+                    weight,
+                    kernel,
+                    normalize_kernel=False,
+                    boundary="fill",
+                    fill_value=0.0,
                 )
                 with np.errstate(invalid="ignore", divide="ignore"):
                     smoothed_map = convolved_map / convolved_weight
