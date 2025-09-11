@@ -20,7 +20,7 @@ def point_source_with_background_wcs():
     simmap = stokesMapSimulation()
     simmap.add_simulation_component(whiteNoise(I_rms=0.1, Q_rms=0.1, U_rms=0.1))
     simmap.add_simulation_component(
-        pointSource(I=10 / 4.5, Q=4 / 4.5, U=2 / 4.5, fwhm_deg=2 / 60)
+        pointSource(I=100 / 4.5, Q=40 / 4.5, U=20 / 4.5, fwhm_deg=2 / 60)
     )
     simmap.set_projection((w, shape))
     simmap.I
@@ -41,8 +41,8 @@ def test_photometry_apertureannulus(point_source_with_background_wcs):
 
     for stoke, value, err in zip(res[2], res[0], res[1]):
         if stoke == "I":
-            assert value == pytest.approx(10, err)
+            assert value == pytest.approx(100, abs=3 * err)
         elif stoke == "Q":
-            assert value == pytest.approx(4, err)
+            assert value == pytest.approx(40, abs=3 * err)
         elif stoke == "U":
-            assert value == pytest.approx(2, err)
+            assert value == pytest.approx(20, abs=3 * err)
