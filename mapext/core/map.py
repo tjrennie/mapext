@@ -683,7 +683,7 @@ class stokesMap:
             logger.info("Assuming FWHM is given in degrees: %s", fwhm)
 
         # determine smoothing factor
-        smooth_gaussian_deg = (
+        smooth_gauss_fwhm_deg = (
             np.sqrt(fwhm**2 - self._resolution**2).to(astropy_u.deg).value
         )
 
@@ -703,7 +703,7 @@ class stokesMap:
                 stokes_map_clean[~mask] = 0.0
                 smoothed_map = np.array(
                     hp.smoothing(
-                        stokes_map_clean, fwhm=np.radians(smooth_gaussian_deg)
+                        stokes_map_clean, fwhm=np.radians(smooth_gauss_fwhm_deg)
                     ),
                     dtype=float,
                 )
@@ -712,15 +712,34 @@ class stokesMap:
 
             elif (stokes_map is not None) and isinstance(self.projection, WCS):
                 logger.debug("Smoothing %s map", stokes)
-                stokes_map[np.isfinite(stokes_map) == False] = np.nan  # noqa: E712
+                valid = np.isfinite(stokes_map)
+                weight = valid.astype(float)
+                filled_map = np.nan_to_num(stokes_map, nan=0.0)
                 kernel = astropy_conv.Gaussian2DKernel(
-                    x_stddev=smooth_gaussian_deg / self.projection.wcs.cdelt[0],
-                    y_stddev=smooth_gaussian_deg / self.projection.wcs.cdelt[1],
+                    x_stddev=smooth_gauss_fwhm_deg
+                    / (self.projection.wcs.cdelt[0] * 2.355),
+                    y_stddev=smooth_gauss_fwhm_deg
+                    / (self.projection.wcs.cdelt[1] * 2.355),
                 )
-                smoothed_map = astropy_conv.convolve(
-                    stokes_map, kernel, normalize_kernel=True, boundary="fill"
+                convolved_map = astropy_conv.convolve(
+                    filled_map,
+                    kernel,
+                    normalize_kernel=False,
+                    boundary="fill",
+                    fill_value=0.0,
                 )
+                convolved_weight = astropy_conv.convolve(
+                    weight,
+                    kernel,
+                    normalize_kernel=False,
+                    boundary="fill",
+                    fill_value=0.0,
+                )
+                with np.errstate(invalid="ignore", divide="ignore"):
+                    smoothed_map = convolved_map / convolved_weight
+                smoothed_map[~valid] = np.nan
                 setattr(self, f"_{stokes}_MAP", smoothed_map)
+
         self._resolution = fwhm
 
     def set_units(self, new_units):

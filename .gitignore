@@ -176,3 +176,4 @@ cython_debug/
 # Vscode files
 .vscode/
 .vscode-test/
+mapext.code-workspace

@@ -43,8 +43,8 @@ docs = [
 # Development dependencies for testing and code quality tools
 dev = [
   "pytest",
-  "black",
-  "ruff"
+  "black ==25.1.0",
+  "ruff ==0.13.0"
 ]
 
 [project.urls]

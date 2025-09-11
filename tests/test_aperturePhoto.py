@@ -4,6 +4,7 @@ from astropy.wcs import WCS
 from mapext.core.source import astroSrc
 from mapext.photometry.aperturephotometry import apertureAnnulus
 from mapext.simulation import stokesMapSimulation
+from mapext.simulation.noise import whiteNoise
 from mapext.simulation.pointsrc import pointSource
 
 
@@ -17,12 +18,9 @@ def point_source_with_background_wcs():
     shape = (63, 63)
 
     simmap = stokesMapSimulation()
-    # simmap.add_simulation_component(
-    #     coloredNoise(alpha=-1, I_rms=0.1, Q_rms=0.1, U_rms=0.1)
-    # )
-    # simmap.add_simulation_component(whiteNoise(I_rms=0.1, Q_rms=0.1, U_rms=0.1))
+    simmap.add_simulation_component(whiteNoise(I_rms=0.1, Q_rms=0.1, U_rms=0.1))
     simmap.add_simulation_component(
-        pointSource(I=10 / 4.5, Q=4 / 4.5, U=2 / 4.5, fwhm_deg=2 / 60)
+        pointSource(I=100 / 4.5, Q=40 / 4.5, U=20 / 4.5, fwhm_deg=2 / 60)
     )
     simmap.set_projection((w, shape))
     simmap.I
@@ -41,10 +39,10 @@ def test_photometry_apertureannulus(point_source_with_background_wcs):
         plot=False,
     )
 
-    for stoke, value in zip(res[2], res[0]):
+    for stoke, value, err in zip(res[2], res[0], res[1]):
         if stoke == "I":
-            assert value - 10 < 0.1
+            assert value == pytest.approx(100, abs=3 * err)
         elif stoke == "Q":
-            assert value - 4 < 0.1
+            assert value == pytest.approx(40, abs=3 * err)
         elif stoke == "U":
-            assert value - 2 < 0.1
+            assert value == pytest.approx(20, abs=3 * err)

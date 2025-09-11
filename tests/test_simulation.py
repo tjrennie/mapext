@@ -33,7 +33,7 @@ class TestStokesMapSimulationComponent:
     def test_unexpected_param_logging(self):
         with pytest.raises(
             ValueError,
-            match="Unexpected simulation parameter: 'bogus' will be ignored.",
+            match=r"Unexpected simulation parameter: 'bogus' will be ignored.",
         ):
             DummyStokesComponent(bogus=123)
 

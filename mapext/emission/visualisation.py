@@ -94,7 +94,7 @@ def IPA_plot(model, *args):
         Additional arguments passed to the model, typically including
         frequency values and other required parameters.
     """
-    fig, axs = plt.subplots(3, sharex=True)
+    _fig, axs = plt.subplots(3, sharex=True)
     plt.subplots_adjust(hspace=0, top=0.95, bottom=0.15)
 
     axs[0].set_xscale("log")
@@ -159,7 +159,7 @@ def IQU_plot(model, *args):
         Additional arguments passed to the model, typically including
         frequency values and other required parameters.
     """
-    fig, axs = plt.subplots(3, sharex=True)
+    _fig, axs = plt.subplots(3, sharex=True)
     plt.subplots_adjust(hspace=0, top=0.95, bottom=0.15)
 
     axs[0].set_xscale("log")

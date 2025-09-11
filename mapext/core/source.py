@@ -1,11 +1,15 @@
 """Module defining the astroSrc class for representing astronomical sources and their associated data."""
 
-import csv
-import json
+import logging
 
+import matplotlib.pyplot as plt
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
+
+from mapext.core.stokes import queryable_parameters
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["astroSrc"]
 
@@ -45,14 +49,24 @@ class astroSrc:
         self.flux = np.array(
             [],
             dtype=[
-                ("name", "<U40"),
-                ("freq", "float"),
-                ("bandwidth", "float"),
-                ("values", "float", (7,)),
-                ("errors", "float", (7,)),
+                ("name", "<U40"),  # Name or label for the flux measurement
+                ("freq", "float"),  # Frequency in Hz
+                ("bandwidth", "float"),  # Bandwidth in Hz
+                (
+                    "values",
+                    "float",
+                    (7,),
+                ),  # Stokes parameters I, Q, U, V, P, A, PF in Jy, Jy, Jy, Jy, Jy, degrees, percent
+                ("errors", "float", (7,)),  # Errors in units as applicable
                 ("epoch", "float64"),  # Epoch in decimal years
             ],
         )
+
+    def __repr__(self):
+        return f"<astroSrc: {self.name}, Coord: {self.coord.to_string('decimal')}, Frame: {self.frame}, Flux entries: {len(self.flux)}>"
+
+    # ==========================================================================
+    # Flux Measurement Management
 
     def add_flux(self, name, freq, bandwidth, values, errors, epoch=None):
         """Add a flux measurement entry.
@@ -105,90 +119,69 @@ class astroSrc:
         )
         self.flux = np.append(self.flux, new_entry)
 
-    def __repr__(self):
-        return f"<astroSrc: {self.name}, Coord: {self.coord.to_string('decimal')}, Frame: {self.frame}, Flux entries: {len(self.flux)}>"
+    def plot_stokesflux(
+        self, stokes, ax=None, c="black", marker="x", label_axes=True, epoch=None
+    ):
+        """Plot the Stokes parameters of the flux measurements.
 
-    @classmethod
-    def from_csv(cls, filename):
-        """Load sources from a CSV file.
-
-        The CSV should contain at least columns: name, lon, lat, frame (optional).
-        Additional columns for flux can be added depending on your structure.
-
-        Returns
-        -------
-        list of astroSrc
+        Parameters
+        ----------
+        stokes : str
+            The Stokes parameter to plot (e.g., 'I', 'Q', 'U', 'V').
+        ax : matplotlib.axes.Axes, optional
+            Axes to plot on. If None, uses the current axes.
+        c : str, optional
+            Color of the markers (default 'black').
+        marker : str, optional
+            Marker style for the plot (default 'x').
+        label_axes : bool, optional
+            Whether to label the axes (default True).
+        epoch : float or str, optional
+            Observation time as decimal year.
         """
-        sources = []
-        with open(filename, newline="") as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                name = row["name"]
-                coords = [float(row["lon"]), float(row["lat"])]
-                frame = row.get("frame", "galactic")
+        if stokes not in queryable_parameters:
+            raise ValueError(
+                f"Invalid Stokes parameter: {stokes}. Must be one of {queryable_parameters}."
+            )
+        stokes_index = queryable_parameters.index(stokes)
 
-                src = cls(name=name, coords=coords, frame=frame)
+        if ax is None:
+            ax = plt.gca()
 
-                # Optional: parse flux if provided
-                if "freq" in row and "bandwidth" in row and "epoch" in row:
-                    freq = float(row["freq"])
-                    bandwidth = float(row["bandwidth"])
-                    epoch = float(row["epoch"])
-                    values = {
-                        key: float(row[key])
-                        for key in ["I", "Q", "U", "V", "P", "A", "PF"]
-                        if key in row
-                    }
-                    errors = {
-                        f"{key}_err": float(row[f"{key}_err"])
-                        for key in ["I", "Q", "U", "V", "P", "A", "PF"]
-                        if f"{key}_err" in row
-                    }
-                    # Strip "_err" keys to match expected input
-                    errors = {k.replace("_err", ""): v for k, v in errors.items()}
-                    src.add_flux(
-                        name="flux_entry",
-                        freq=freq,
-                        bandwidth=bandwidth,
-                        values=values,
-                        errors=errors,
-                        epoch=epoch,
-                    )
+        secvar_correction = 1.0
+        if epoch:
+            if hasattr(self, "model_secvar"):
+                secvar_correction = self.model_secvar(
+                    **{name: self.flux[name] for name in self.flux.dtype.names}
+                )
+            else:
+                logger.warning("No secvar model available, skipping secvar correction.")
 
-                sources.append(src)
-        return sources
+        ax.errorbar(
+            self.flux["freq"],
+            self.flux["values"][:, stokes_index] * secvar_correction,
+            xerr=self.flux["bandwidth"] / 2,
+            yerr=self.flux["errors"][:, stokes_index] * secvar_correction,
+            ls="none",
+            marker=marker,
+            c=c,
+        )
 
-    @classmethod
-    def from_json(cls, filename):
-        """Load sources from a JSON file.
+        if label_axes:
+            ax.set_xlabel(r"$\nu$ [Hz]")
+            stokes_upper = stokes.upper()
 
-        Expects a list of dicts, each with keys: name, coords (list), frame (optional), flux (optional).
+            subscript = rf"\nu, {epoch}" if epoch is not None else r"\nu"
 
-        Returns
-        -------
-        list of astroSrc
-        """
-        with open(filename) as f:
-            data = json.load(f)
-
-        sources = []
-        for item in data:
-            name = item["name"]
-            coords = item["coords"]
-            frame = item.get("frame", "galactic")
-
-            src = cls(name=name, coords=coords, frame=frame)
-
-            if "flux" in item:
-                for flux_entry in item["flux"]:
-                    src.add_flux(
-                        flux_entry["name"],
-                        flux_entry["freq"],
-                        flux_entry["bandwidth"],
-                        flux_entry["values"],
-                        flux_entry["errors"],
-                        flux_entry.get("epoch", None),
-                    )
-
-            sources.append(src)
-        return sources
+            if stokes_upper in ["I", "Q", "U", "V"]:
+                ax.set_ylabel(rf"$S^{{({stokes_upper})}}_{{{subscript}}}$ [Jy]")
+            elif stokes_upper == "P":
+                ax.set_ylabel(rf"$P_{{{subscript}}}$ [%]")  # polarized intensity
+            elif stokes_upper == "A":
+                ax.set_ylabel(rf"$\phi_{{{subscript}}}$ [deg]")  # polarization angle
+            elif stokes_upper == "PF":
+                ax.set_ylabel(
+                    rf"$\frac{{P_{{{subscript}}}}}{{S^{{(I)}}_{{{subscript}}}}}$ [%]"
+                )  # polarization fraction
+            else:
+                raise ValueError(f"Unknown Stokes parameter: {stokes_upper}")
