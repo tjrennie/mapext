@@ -5,7 +5,6 @@ such as I, Q, U, V, P, A, and PF, which are commonly used in polarimetry.
 """
 
 import logging
-from typing import ClassVar
 
 import numpy as np
 
@@ -15,7 +14,9 @@ __all__ = [
     "StokesComp",
     "get_derivative_function",
     "get_stokes_value_mapping",
+    "int_to_stokes",
     "queryable_parameters",
+    "stokes_to_int",
     "wrap_theta",
 ]
 
@@ -29,13 +30,25 @@ display_parameters = {
     "PF": r"$p$",  # Total polarisation fraction
 }
 
+stokes_to_int: dict[str, int] = {
+    "I": 0,
+    "Q": 1,
+    "U": 2,
+    "V": 3,
+    "P": 4,
+    "A": 5,  # Also called 'theta'
+    "PF": 6,
+}
+
+int_to_stokes: dict[int, str] = {v: k for k, v in stokes_to_int.items()}
+
 queryable_parameters = list(display_parameters.keys())
 
 _hpi = np.pi / 2
 
 
-def wrap_theta(value):
-    """Wrap the given angle value to the range [0, π).
+def wrap_theta(value: float) -> float:
+    """Wrap the given angle value to the range [0, π].
 
     Parameters
     ----------
@@ -45,7 +58,7 @@ def wrap_theta(value):
     Returns
     -------
     float
-        The wrapped angle value within the range [0, π).
+        The wrapped angle value within the range [0, π].
     """
     return value % np.pi
 
@@ -70,42 +83,52 @@ class StokesComp:
         Convert the Stokes parameter letter to its float representation.
     """
 
-    _conversion_dict: ClassVar[dict[str, int]] = {
-        "I": 0,
-        "Q": 1,
-        "U": 2,
-        "V": 3,
-        "P": 4,
-        "A": 5,  # Also called 'theta'
-        "PF": 6,
-    }
-
     def __init__(self, letter: str):
         letter = letter.upper().strip()  # Normalize input
-        if letter not in self._conversion_dict:
+        if letter not in stokes_to_int:
             logger.error(f"Invalid Stokes parameter: {letter}")
             raise ValueError(f"Invalid parameter: {letter}")
         self.letter = letter
 
-    def to_int(self):
+    def to_int(self) -> int:
         """Convert the Stokes parameter letter to its integer representation."""
-        return int(self._conversion_dict[self.letter])
+        return stokes_to_int[self.letter]
 
-    def to_float(self):
+    def to_float(self) -> float:
         """Convert the Stokes parameter letter to its float representation."""
-        return float(self._conversion_dict[self.letter])
+        return float(stokes_to_int[self.letter])
 
-    def __repr__(self):
+    @classmethod
+    def from_int(cls, value: int) -> "StokesComp":
+        """Create a StokesComp from its integer representation."""
+        if value not in int_to_stokes:
+            logger.error(f"Invalid Stokes integer: {value}")
+            raise ValueError(f"Invalid Stokes integer: {value}")
+        return cls(int_to_stokes[value])
+
+    def __repr__(self) -> str:
         """Convert the Stokes parameter letter to its string representation."""
         return f"Stokes('{self.letter}')"
 
-    def __int__(self):
+    def __int__(self) -> int:
         """Convert the Stokes parameter letter to its integer representation."""
         return self.to_int()
 
-    def __float__(self):
+    def __float__(self) -> float:
         """Convert the Stokes parameter letter to its float representation."""
         return self.to_float()
+
+    def __eq__(self, other) -> bool:
+        if isinstance(other, StokesComp):
+            return self.letter == other.letter
+        if isinstance(other, str):
+            return self.letter == other.upper().strip()
+        if isinstance(other, int):
+            return self.to_int() == other
+        return False
+
+    def __hash__(self) -> int:
+        return hash(self.letter)
 
 
 def get_stokes_value_mapping(
@@ -153,7 +176,7 @@ def get_stokes_value_mapping(
 
 
 def get_derivative_function(func, derivative):
-    """Returns the derivative function if requested, else returns the original function."""
+    """Return the derivative function if requested, else the original."""
     return get_derivative(func) if derivative else func
 
 
