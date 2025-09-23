@@ -628,6 +628,16 @@ class stokesMap:
             **{param: getattr(self, f"_{param}_MAP") for param in self._maps_cached}
         )
 
+    def get_beam_area(self):
+        """Retrieve beam area in steradians.
+
+        Returns
+        -------
+        astropy Quantity
+            Beam area in steradians.
+        """
+        return (np.pi * (self._resolution / 2.355) ** 2).to(astropy_u.sr)
+
     @property
     def I(self):  # noqa: E743
         """Stokes I map."""
