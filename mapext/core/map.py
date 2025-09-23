@@ -138,7 +138,7 @@ class stokesMap:
         # Load wavelength information if supplied
         if "wavelength" in load_data:
             if isinstance(load_data["wavelength"], dict):
-                self.wavelength = load_data["frequency"]["center"] * astropy_u.m
+                self.wavelength = load_data["wavelength"]["center"] * astropy_u.m
             elif isinstance(load_data["wavelength"], float):
                 self.wavelength = load_data["wavelength"] * astropy_u.m
             logger.info(
