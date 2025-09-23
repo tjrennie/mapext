@@ -142,13 +142,13 @@ def apertureAnnulus(
         for s, f, e in zip(Svs, Sv, Sve):
             print(f"{s}: {f:.4g} ± {e:.4g}")
 
-    if plot:
+    if plot!=False:
         fig = apPhoto_regionPlot(
             astro_map,
             astro_source,
             region_src,
             region_bkg,
-            components="core",
+            components="core" if plot is True else plot,
             assume_v_0=assume_v_0,
         )
         if save_path:
