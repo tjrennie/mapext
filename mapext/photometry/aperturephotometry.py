@@ -10,8 +10,6 @@ import numpy as np
 from astropy.wcs.utils import skycoord_to_pixel
 from regions import CircleAnnulusSkyRegion, CircleSkyRegion
 
-from mapext.core.stokes import display_parameters
-
 logger = logging.getLogger(__name__)
 
 
@@ -50,28 +48,63 @@ def apPhoto(astro_map, foreground, background):
     if astro_map.assume_v_0:
         Sv_stokes = [stokes for stokes in Sv_stokes if stokes != "V"]
 
+    # --- Precompute pixel-to-beam conversion (done once) ---
+    pix_scale_x, pix_scale_y = np.abs(astro_map.projection.wcs.cdelt)  # deg/pixel
+    pix_area = pix_scale_x * pix_scale_y  # deg^2 per pixel
+
+    if astro_map._resolution is None:
+        beam_area_pix = 1.0  # Assume 1 pixel per beam if no resolution info
+    else:
+        theta_fwhm = astro_map._resolution.to(astropy_u.deg).value
+        beam_area = (np.pi / (4.0 * np.log(2.0))) * (
+            theta_fwhm**2
+        )  # deg^2 (Gaussian beam)
+        beam_area_pix = max(beam_area / pix_area, 1.0)
+
     for stokes in Sv_stokes:
         compmap = getattr(astro_map, stokes)
 
+        # Flux sums
         src_sum = np.nansum(compmap * src_mask)
         src_cnt = np.nansum(src_mask * np.isfinite(compmap))
 
-        bkg_med = np.nanmedian(compmap[bkg_mask > 0.5])
-        bkg_std = np.nanstd(compmap[bkg_mask > 0.5])
+        # Background statistics
+        bkg_vals = compmap[bkg_mask > 0.5]
+        bkg_med = np.nanmedian(bkg_vals)
+        bkg_std = np.nanstd(bkg_vals)
         bkg_cnt = np.nansum((bkg_mask > 0.5) * np.isfinite(compmap))
 
+        # Calibration fraction
         calibration_frac = 0.01 * astro_map._calibration.get(stokes, {}).get(
             "percentage", 0
         )
 
+        # Background-subtracted flux
         S_nu = src_sum - (bkg_med * src_cnt)
         Sv.append(S_nu)
 
-        bkg_err_sq = bkg_std**2 * src_cnt * (1 + (np.pi / 2) * (src_cnt / bkg_cnt))
-        cal_err_sq = (calibration_frac * S_nu) ** 2
+        # --- Beam-aware error propagation ---
+        N_src_beam = max(src_cnt / beam_area_pix, 1.0)
+        N_bkg_beam = max(bkg_cnt / beam_area_pix, 1.0)
 
+        bkg_err_sq = bkg_std**2 * N_src_beam * (1 + N_src_beam / N_bkg_beam)
+        cal_err_sq = (calibration_frac * S_nu) ** 2
         S_nu_err = np.sqrt(bkg_err_sq + cal_err_sq)
         Sv_e.append(S_nu_err)
+
+        # --- Debug output per Stokes ---
+        print(f"\n[DEBUG] Stokes {stokes}")
+        print(f"  Source sum: {src_sum:.4e}, Source pixels: {src_cnt:.1f}")
+        print(
+            f"  Background median: {bkg_med:.4e}, std: {bkg_std:.4e}, pixels: {bkg_cnt:.1f}"
+        )
+        print(f"  Background-subtracted flux: {S_nu:.4e}")
+        print(f"  Calibration fraction: {calibration_frac:.4e}")
+        print(f"  Source beams: {N_src_beam:.2f}, Background beams: {N_bkg_beam:.2f}")
+        print(
+            f"  Error terms: bkg={np.sqrt(bkg_err_sq):.4e}, cal={np.sqrt(cal_err_sq):.4e}"
+        )
+        print(f"  Total error: {S_nu_err:.4e}")
 
     return Sv, Sv_e, Sv_stokes
 
@@ -142,7 +175,7 @@ def apertureAnnulus(
         for s, f, e in zip(Svs, Sv, Sve):
             print(f"{s}: {f:.4g} ± {e:.4g}")
 
-    if plot!=False:
+    if plot:
         fig = apPhoto_regionPlot(
             astro_map,
             astro_source,
@@ -186,12 +219,12 @@ def apPhoto_regionPlot(
     components="all",
     assume_v_0=True,
 ):
-    """Plot the bullseye region for aperture photometry.
+    """Plot the bullseye region for aperture photometry, zoomed on the source.
 
     Parameters
     ----------
-    astro_map : AstroMap
-        Map object containing Stokes parameters.
+    astro_map : stokesMap
+        Map object containing Stokes parameters as attributes (I, Q, U, V, etc.).
     astro_source : AstroSource
         Source object containing sky coordinates.
     aperture_region : CircleSkyRegion
@@ -209,13 +242,12 @@ def apPhoto_regionPlot(
     fig : matplotlib.figure.Figure
         The figure containing the bullseye plot.
     """
+    # Determine components to plot
     if components == "all":
-        components = list(display_parameters.keys())
+        components = ["I", "Q", "U", "V", "P", "A", "PF"]
         if assume_v_0:
-            components = [comp for comp in components if comp != "V"]
-            rows = [components[:-3], components[-3:]]
-        else:
-            rows = [components[:1], components[1:-3], components[-3:]]
+            components = [c for c in components if c != "V"]
+        rows = [components[: len(components) // 2], components[len(components) // 2 :]]
     elif components == "core":
         components = ["I", "Q", "U", "V"]
         if assume_v_0:
@@ -224,82 +256,119 @@ def apPhoto_regionPlot(
     else:
         rows = [components]
 
+    # Grid shape
     if len(rows) > 1:
-        gridshape = (len(rows), 2 * max(*[len(x) for x in rows]))
+        gridshape = (len(rows), 2 * max(len(r) for r in rows))
     else:
         gridshape = (1, 2 * len(rows[0]))
 
-    fig = plt.figure(figsize=(gridshape[1] * 3 / 2, gridshape[0] * 4))
+    fig = plt.figure(figsize=(gridshape[1] * 1.5, gridshape[0] * 4))
     gs = gridspec.GridSpec(
         gridshape[0], gridshape[1], figure=fig, wspace=0.2, hspace=0.2
     )
     axs = []
 
+    # Convert aperture and annulus to pixel coordinates
+    aperture_px = aperture_region.to_pixel(astro_map.projection)
+    annulus_px = annulus_region.to_pixel(astro_map.projection)
+
+    # Compute zoom limits based on aperture and annulus
+    x_min = aperture_px.center.x - annulus_px.outer_radius
+    x_max = aperture_px.center.x + annulus_px.outer_radius
+    y_min = aperture_px.center.y - annulus_px.outer_radius
+    y_max = aperture_px.center.y + annulus_px.outer_radius
+    pad_x = (x_max - x_min) * 0.2
+    pad_y = (y_max - y_min) * 0.2
+    xlim = (x_min - pad_x, x_max + pad_x)
+    ylim = (y_min - pad_y, y_max + pad_y)
+
+    # Determine map shape from first available component
+    for attr in ["I", "Q", "U", "V", "P", "A", "PF"]:
+        if hasattr(astro_map, attr):
+            map_shape = getattr(astro_map, attr).shape
+            break
+    else:
+        raise ValueError("astro_map has no recognized Stokes components.")
+
     for i, row in enumerate(rows):
         row_len = len(row)
         for j, comp in enumerate(row):
-            axs.append(
-                fig.add_subplot(
-                    gs[
-                        i,
-                        gridshape[1] // 2
-                        - row_len
-                        + 2 * j : gridshape[1] // 2
-                        - row_len
-                        + 2 * j
-                        + 2,
-                    ],
-                    projection=astro_map.projection,
-                    sharex=axs[0] if i > 0 else None,
-                    sharey=axs[0] if j > 0 else None,
-                )
+            ax = fig.add_subplot(
+                gs[
+                    i,
+                    gridshape[1] // 2
+                    - row_len
+                    + 2 * j : gridshape[1] // 2
+                    - row_len
+                    + 2 * j
+                    + 2,
+                ],
+                projection=astro_map.projection,
+                sharex=axs[0] if axs else None,
+                sharey=axs[0] if axs else None,
             )
+            axs.append(ax)
 
+            # Get data
             try:
                 m = getattr(astro_map, comp)
             except (AttributeError, ValueError):
-                m = np.full(astro_map.shape, np.nan)
+                m = np.full(map_shape, np.nan)
 
+            # Convert angles for 'A'
             if comp == "A":
                 m = np.degrees(m)
 
+            # Crop to zoom region
+            x_start, x_end = int(max(xlim[0], 0)), int(min(xlim[1], map_shape[1]))
+            y_start, y_end = int(max(ylim[0], 0)), int(min(ylim[1], map_shape[0]))
+            m_crop = m[y_start:y_end, x_start:x_end]
+
+            # Plot
             if comp == "A":
-                im_base = axs[-1].imshow(
-                    m,
+                im_base = ax.imshow(
+                    m_crop,
                     origin="lower",
                     vmin=0,
                     vmax=180,
                     cmap=cc.cm["cyclic_mygbm_30_95_c78"],
+                    extent=(x_start, x_end, y_start, y_end),
                 )
             else:
-                im_base = axs[-1].imshow(
-                    m, origin="lower", cmap=cc.cm["linear_bmy_10_95_c78"]
+                im_base = ax.imshow(
+                    m_crop,
+                    origin="lower",
+                    cmap=cc.cm["linear_bmy_10_95_c78"],
+                    extent=(x_start, x_end, y_start, y_end),
                 )
 
+            # Mark source
             x, y = skycoord_to_pixel(astro_source.coord, astro_map.projection)
-            axs[-1].axhline(y, color="#000000", lw=1, alpha=0.5)
-            axs[-1].axvline(x, color="#000000", lw=1, alpha=0.5)
+            ax.axhline(y, color="#000000", lw=1, alpha=0.5)
+            ax.axvline(x, color="#000000", lw=1, alpha=0.5)
 
-            aperture_region.to_pixel(astro_map.projection).plot(
-                ax=axs[-1], color="#00ECE1", lw=1, ls="solid", label="Aperture"
-            )
-            annulus_region.to_pixel(astro_map.projection).plot(
-                ax=axs[-1], color="#00E73A", lw=1, ls="solid", label="Annulus"
-            )
+            # Overlay aperture & annulus
+            aperture_px.plot(ax=ax, color="#00ECE1", lw=1, ls="solid", label="Aperture")
+            annulus_px.plot(ax=ax, color="#00E73A", lw=1, ls="solid", label="Annulus")
 
-            axs[-1].set_title(f"{comp}")
-            axs[-1].set_xlabel(astro_map.projection.wcs.ctype[0])
-            axs[-1].set_ylabel(astro_map.projection.wcs.ctype[1])
+            ax.set_xlim(xlim)
+            ax.set_ylim(ylim)
+            ax.set_title(f"{comp}")
+            ax.set_xlabel(astro_map.projection.wcs.ctype[0])
+            ax.set_ylabel(astro_map.projection.wcs.ctype[1])
 
-            if comp in ["I", "Q", "U", "V", "P"]:
-                units = astro_map._unit
-            elif comp == "A":
-                units = "Degrees"
-            elif comp == "PF":
-                units = "N/A"
-            else:
-                raise ValueError(f"Unknown component {comp} for units.")
+            # Units
+            unit_map = {
+                "I": astro_map._unit,
+                "Q": astro_map._unit,
+                "U": astro_map._unit,
+                "V": astro_map._unit,
+                "P": astro_map._unit,
+                "A": "Degrees",
+                "PF": "N/A",
+            }
+            units = unit_map.get(comp, "Unknown")
 
-            plt.colorbar(im_base, ax=axs[-1], orientation="horizontal", label=units)
+            plt.colorbar(im_base, ax=ax, orientation="horizontal", label=units)
 
     return fig
