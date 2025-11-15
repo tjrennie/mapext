@@ -635,8 +635,16 @@ class stokesMap:
         -------
         astropy Quantity
             Beam area in steradians.
+
+        Raises
+        ------
+        ValueError
+            If resolution is not set, cannot compute beam area.
         """
-        return (np.pi * (self._resolution / 2.355) ** 2).to(astropy_u.sr)
+        if self._resolution is None:
+            raise ValueError("Resolution is not set. Cannot compute beam area.")
+        FWHM_to_SIGMA = 2.0 * np.sqrt(2.0 * np.log(2.0))
+        return (np.pi * (self._resolution / FWHM_to_SIGMA) ** 2).to(astropy_u.sr)
 
     @property
     def I(self):  # noqa: E743

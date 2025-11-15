@@ -14,12 +14,12 @@ logger = logging.getLogger(__name__)
 
 
 def apPhoto(astro_map, foreground, background):
-    """Perform aperture photometry on a single AstroMap object using a foreground region and background region.
+    """Perform aperture photometry on a single stokesMap object using a foreground region and background region.
 
     Parameters
     ----------
-    astro_map : AstroMap
-        The AstroMap object containing Stokes parameters.
+    astro_map : stokesMap
+        The stokesMap object containing Stokes parameters.
     foreground : CircleSkyRegion
         The region defining the source aperture.
     background : CircleAnnulusSkyRegion
@@ -92,20 +92,6 @@ def apPhoto(astro_map, foreground, background):
         S_nu_err = np.sqrt(bkg_err_sq + cal_err_sq)
         Sv_e.append(S_nu_err)
 
-        # --- Debug output per Stokes ---
-        print(f"\n[DEBUG] Stokes {stokes}")
-        print(f"  Source sum: {src_sum:.4e}, Source pixels: {src_cnt:.1f}")
-        print(
-            f"  Background median: {bkg_med:.4e}, std: {bkg_std:.4e}, pixels: {bkg_cnt:.1f}"
-        )
-        print(f"  Background-subtracted flux: {S_nu:.4e}")
-        print(f"  Calibration fraction: {calibration_frac:.4e}")
-        print(f"  Source beams: {N_src_beam:.2f}, Background beams: {N_bkg_beam:.2f}")
-        print(
-            f"  Error terms: bkg={np.sqrt(bkg_err_sq):.4e}, cal={np.sqrt(cal_err_sq):.4e}"
-        )
-        print(f"  Total error: {S_nu_err:.4e}")
-
     return Sv, Sv_e, Sv_stokes
 
 
@@ -126,7 +112,7 @@ def apertureAnnulus(
 
     Parameters
     ----------
-    astro_map : AstroMap
+    astro_map : stokesMap
         Map object containing Stokes parameters.
     astro_source : AstroSource
         Source object containing sky coordinates.
@@ -181,7 +167,7 @@ def apertureAnnulus(
             astro_source,
             region_src,
             region_bkg,
-            components="core" if plot is True else plot,
+            components="core" if isinstance(plot, bool) else plot,
             assume_v_0=assume_v_0,
         )
         if save_path:
@@ -258,7 +244,7 @@ def apPhoto_regionPlot(
 
     # Grid shape
     if len(rows) > 1:
-        gridshape = (len(rows), 2 * max(len(r) for r in rows))
+        gridshape = (len(rows), 2 * max(len(r) for r in rows) if rows else 0)
     else:
         gridshape = (1, 2 * len(rows[0]))
 
