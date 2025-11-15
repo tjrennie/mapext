@@ -138,7 +138,7 @@ class stokesMap:
         # Load wavelength information if supplied
         if "wavelength" in load_data:
             if isinstance(load_data["wavelength"], dict):
-                self.wavelength = load_data["frequency"]["center"] * astropy_u.m
+                self.wavelength = load_data["wavelength"]["center"] * astropy_u.m
             elif isinstance(load_data["wavelength"], float):
                 self.wavelength = load_data["wavelength"] * astropy_u.m
             logger.info(
@@ -627,6 +627,24 @@ class stokesMap:
         return func(
             **{param: getattr(self, f"_{param}_MAP") for param in self._maps_cached}
         )
+
+    def get_beam_area(self):
+        """Retrieve beam area in steradians.
+
+        Returns
+        -------
+        astropy Quantity
+            Beam area in steradians.
+
+        Raises
+        ------
+        ValueError
+            If resolution is not set, cannot compute beam area.
+        """
+        if self._resolution is None:
+            raise ValueError("Resolution is not set. Cannot compute beam area.")
+        FWHM_to_SIGMA = 2.0 * np.sqrt(2.0 * np.log(2.0))
+        return (np.pi * (self._resolution / FWHM_to_SIGMA) ** 2).to(astropy_u.sr)
 
     @property
     def I(self):  # noqa: E743
